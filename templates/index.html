@@ -159,7 +159,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 56px; text-align: ce
   </div>
   <div class="hero-right">
     <div class="hero-stat">
-      <div class="hero-stat-num">{{ apartments|length }}</div>
+      <div class="hero-stat-num">{{ apartments|length }}+</div>
       <div class="hero-stat-label">Актуальных объектов</div>
     </div>
     <div class="hero-divider"></div>
@@ -173,7 +173,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 56px; text-align: ce
 <section class="section">
   <div class="section-header">
     <h2 class="section-title">Все объекты</h2>
-    <span class="section-count">{{ apartments|length }}</span>
+    <span class="section-count">{{ apartments|length }}+</span>
   </div>
 
   {% if apartments %}
@@ -261,6 +261,19 @@ footer { border-top: 1px solid var(--border); padding: 28px 56px; text-align: ce
     <p>Добавьте квартиры через <a href="/admin" style="color:var(--gold)">админ-панель</a></p>
   </div>
   {% endif %}
+</section>
+
+<section style="max-width:1280px; margin:0 auto; padding:0 56px 80px;">
+  <div style="background:var(--ink); border-radius:2px; padding:56px; display:flex; align-items:center; justify-content:space-between; gap:32px; flex-wrap:wrap;">
+    <div>
+      <p style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:12px;">Персональный подбор</p>
+      <h2 style="font-family:'Playfair Display',serif; font-size:28px; font-weight:400; color:#fff; margin-bottom:8px;">Не нашли желаемое?</h2>
+      <p style="font-size:15px; color:rgba(255,255,255,0.6); font-weight:300; max-width:400px;">Пройдите короткий опрос — мы подберём варианты под ваши параметры и свяжемся с вами.</p>
+    </div>
+    <a href="/quiz" style="padding:18px 40px; background:var(--gold); color:#fff; text-decoration:none; border-radius:2px; font-family:'Outfit',sans-serif; font-size:12px; letter-spacing:0.16em; text-transform:uppercase; font-weight:500; white-space:nowrap; transition:opacity 0.2s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+      Подобрать квартиру →
+    </a>
+  </div>
 </section>
 
 <footer><p>© 2025 · Все права защищены</p></footer>

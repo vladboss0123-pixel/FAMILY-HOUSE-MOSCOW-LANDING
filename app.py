@@ -105,6 +105,46 @@ def create_amo_lead(name, phone, apartment_title):
 def privacy():
     return render_template('privacy.html')
 
+@app.route('/quiz')
+def quiz():
+    return render_template('quiz.html')
+
+@app.route('/submit-quiz', methods=['POST'])
+def submit_quiz():
+    data = request.json
+    name = data.get('name', '').strip()
+    phone = data.get('phone', '').strip()
+    note = data.get('note', '')
+    if not name or not phone:
+        return jsonify({'success': False, 'error': 'Заполните все поля'})
+
+    # Создаём лид в AmoCRM
+    if AMO_TOKEN and AMO_DOMAIN:
+        base = f'https://{AMO_DOMAIN}'
+        headers = amo_headers()
+        try:
+            contact_payload = [{'name': name, 'custom_fields_values': [{'field_code': 'PHONE', 'values': [{'value': phone, 'enum_code': 'MOB'}]}]}]
+            r = requests.post(f'{base}/api/v4/contacts', headers=headers, json=contact_payload, timeout=10)
+            contact_id = r.json()['_embedded']['contacts'][0]['id']
+
+            lead_payload = [{'name': f'Квиз: подбор квартиры', 'pipeline_id': AMO_PIPELINE_ID, 'status_id': AMO_STATUS_ID, '_embedded': {'contacts': [{'id': contact_id}], 'tags': [{'name': 'tenet'}, {'name': 'квиз'}]}}]
+            r = requests.post(f'{base}/api/v4/leads', headers=headers, json=lead_payload, timeout=10)
+            lead_id = r.json()['_embedded']['leads'][0]['id']
+
+            requests.patch(f'{base}/api/v4/leads', headers=headers, json=[{'id': lead_id, 'tags': [{'name': 'tenet'}, {'name': 'квиз'}]}], timeout=10)
+
+            note_payload = [{'entity_id': lead_id, 'note_type': 'common', 'params': {'text': note}}]
+            requests.post(f'{base}/api/v4/leads/notes', headers=headers, json=note_payload, timeout=10)
+        except Exception as e:
+            print(f'Ошибка AmoCRM квиз: {e}')
+
+    # Логируем локально
+    log_file = 'data/leads.json'
+    logs = json.load(open(log_file)) if os.path.exists(log_file) else []
+    logs.append({'time': datetime.now().isoformat(), 'name': name, 'phone': phone, 'apartment': 'Квиз', 'note': note})
+    json.dump(logs, open(log_file, 'w'), ensure_ascii=False, indent=2)
+    return jsonify({'success': True})
+
 @app.route('/')
 def index():
     apartments = [a for a in load_apartments() if a.get('active', True)]

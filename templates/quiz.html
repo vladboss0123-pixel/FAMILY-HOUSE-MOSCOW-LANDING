@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Подобрать квартиру</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f5f2ed; --white: #fff; --ink: #1c1917;
+  --muted: #78716c; --border: #e5e0d8;
+  --gold: #b8965a; --gold-light: #f0e6d3;
+}
+body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; }
+
+header { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 56px; height: 68px; display: flex; align-items: center; justify-content: space-between; }
+.logo { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 500; color: var(--ink); text-decoration: none; }
+.logo span { color: var(--gold); }
+.back { font-size: 13px; color: var(--muted); text-decoration: none; display: flex; align-items: center; gap: 6px; transition: color 0.2s; }
+.back:hover { color: var(--gold); }
+
+.quiz-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
+
+.quiz-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 4px; width: 100%; max-width: 580px;
+  overflow: hidden;
+}
+
+/* Progress bar */
+.progress-bar { height: 4px; background: var(--border); }
+.progress-fill { height: 100%; background: var(--gold); transition: width 0.4s ease; }
+
+.quiz-inner { padding: 48px; }
+
+.step { display: none; }
+.step.active { display: block; animation: fadeIn 0.3s ease; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.step-label { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 12px; }
+.step-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 400; margin-bottom: 8px; line-height: 1.2; }
+.step-sub { font-size: 14px; color: var(--muted); margin-bottom: 32px; font-weight: 300; }
+
+/* Options */
+.options { display: flex; flex-direction: column; gap: 10px; }
+.options.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.option {
+  padding: 16px 20px; border: 1px solid var(--border); border-radius: 2px;
+  cursor: pointer; transition: all 0.2s; font-size: 15px; font-weight: 400;
+  color: var(--ink); text-align: left; background: var(--bg);
+  display: flex; align-items: center; gap: 12px;
+}
+.option:hover { border-color: var(--gold); background: var(--gold-light); }
+.option.selected { border-color: var(--gold); background: var(--gold-light); color: var(--ink); }
+.option-icon { font-size: 20px; flex-shrink: 0; }
+.option-text { display: flex; flex-direction: column; gap: 2px; }
+.option-main { font-size: 15px; font-weight: 500; }
+.option-hint { font-size: 12px; color: var(--muted); font-weight: 300; }
+
+/* Contact step */
+.fgroup { margin-bottom: 18px; }
+.flabel { display: block; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+.finput { width: 100%; padding: 14px 16px; border: 1px solid var(--border); border-radius: 2px; font-family: 'Outfit', sans-serif; font-size: 15px; color: var(--ink); background: var(--bg); outline: none; transition: border-color 0.2s; }
+.finput:focus { border-color: var(--gold); }
+
+/* Navigation */
+.quiz-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
+.btn-back { background: none; border: none; font-family: 'Outfit', sans-serif; font-size: 13px; color: var(--muted); cursor: pointer; padding: 0; transition: color 0.2s; }
+.btn-back:hover { color: var(--ink); }
+.btn-next { padding: 14px 32px; background: var(--ink); color: var(--white); border: none; border-radius: 2px; font-family: 'Outfit', sans-serif; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+.btn-next:hover { background: var(--gold); }
+.btn-next:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.step-counter { font-size: 12px; color: var(--muted); }
+
+/* Success */
+.success { text-align: center; padding: 20px 0; }
+.success-ring { width: 72px; height: 72px; border: 1px solid var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; }
+.success h2 { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 400; margin-bottom: 12px; }
+.success p { font-size: 15px; color: var(--muted); line-height: 1.7; font-weight: 300; margin-bottom: 24px; }
+.btn-home { display: inline-block; padding: 14px 32px; background: var(--ink); color: var(--white); text-decoration: none; border-radius: 2px; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500; transition: background 0.2s; }
+.btn-home:hover { background: var(--gold); }
+
+.fnote { font-size: 11px; color: var(--muted); text-align: center; margin-top: 14px; line-height: 1.6; }
+.fnote a { color: var(--gold); }
+
+footer { border-top: 1px solid var(--border); padding: 20px 56px; text-align: center; font-size: 12px; color: var(--muted); }
+
+@media (max-width: 640px) {
+  header { padding: 0 24px; }
+  .quiz-inner { padding: 32px 24px; }
+  .options.grid { grid-template-columns: 1fr; }
+  footer { padding: 20px 24px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="logo">Подборка лучших <span>квартир в Москве</span></a>
+  <a href="/" class="back">← К объектам</a>
+</header>
+
+<div class="quiz-wrap">
+  <div class="quiz-card">
+    <div class="progress-bar"><div class="progress-fill" id="progress" style="width:20%"></div></div>
+    <div class="quiz-inner">
+
+      <!-- Шаг 1 -->
+      <div class="step active" id="step-1">
+        <p class="step-label">Шаг 1 из 4</p>
+        <h2 class="step-title">Сколько комнат вам нужно?</h2>
+        <p class="step-sub">Выберите подходящий вариант</p>
+        <div class="options grid">
+          <button class="option" onclick="selectOption(this, 'rooms', 'Студия')">
+            <div class="option-text"><span class="option-main">Студия</span></div>
+          </button>
+          <button class="option" onclick="selectOption(this, 'rooms', '1 комната')">
+            <div class="option-text"><span class="option-main">1 комната</span></div>
+          </button>
+          <button class="option" onclick="selectOption(this, 'rooms', '2 комнаты')">
+            <div class="option-text"><span class="option-main">2 комнаты</span></div>
+          </button>
+          <button class="option" onclick="selectOption(this, 'rooms', '3+ комнаты')">
+            <div class="option-text"><span class="option-main">3+ комнаты</span></div>
+          </button>
+        </div>
+        <div class="quiz-nav">
+          <span></span>
+          <span class="step-counter">1 / 4</span>
+          <button class="btn-next" id="next-1" disabled onclick="goNext(2)">Далее →</button>
+        </div>
+      </div>
+
+      <!-- Шаг 2 -->
+      <div class="step" id="step-2">
+        <p class="step-label">Шаг 2 из 4</p>
+        <h2 class="step-title">Какой бюджет?</h2>
+        <p class="step-sub">Укажите комфортный для вас диапазон</p>
+        <div class="options">
+          <button class="option" onclick="selectOption(this, 'budget', 'До 15 млн ₽')">
+            <div class="option-text">
+              <span class="option-main">До 15 млн ₽</span>
+              <span class="option-hint">Студии и однокомнатные</span>
+            </div>
+          </button>
+          <button class="option" onclick="selectOption(this, 'budget', '15–25 млн ₽')">
+            <div class="option-text">
+              <span class="option-main">15–25 млн ₽</span>
+              <span class="option-hint">Двухкомнатные и евродвушки</span>
+            </div>
+          </button>
+          <button class="option" onclick="selectOption(this, 'budget', '25–50 млн ₽')">
+            <div class="option-text">
+              <span class="option-main">25–50 млн ₽</span>
+              <span class="option-hint">Просторные квартиры в хороших районах</span>
+            </div>
+          </button>
+          <button class="option" onclick="selectOption(this, 'budget', 'Свыше 50 млн ₽')">
+            <div class="option-text">
+              <span class="option-main">Свыше 50 млн ₽</span>
+              <span class="option-hint">Премиум сегмент</span>
+            </div>
+          </button>
+        </div>
+        <div class="quiz-nav">
+          <button class="btn-back" onclick="goBack(1)">← Назад</button>
+          <span class="step-counter">2 / 4</span>
+          <button class="btn-next" id="next-2" disabled onclick="goNext(3)">Далее →</button>
+        </div>
+      </div>
+
+      <!-- Шаг 3 -->
+      <div class="step" id="step-3">
+        <p class="step-label">Шаг 3 из 4</p>
+        <h2 class="step-title">Когда планируете покупку?</h2>
+        <p class="step-sub">Это поможет нам подобрать лучшие варианты</p>
+        <div class="options">
+          <button class="option" onclick="selectOption(this, 'timing', 'Готов купить сейчас')">
+            <div class="option-text">
+              <span class="option-main">Готов купить сейчас</span>
+              <span class="option-hint">Уже определился, ищу конкретный объект</span>
+            </div>
+          </button>
+          <button class="option" onclick="selectOption(this, 'timing', 'В течение 3–6 месяцев')">
+            <div class="option-text">
+              <span class="option-main">В течение 3–6 месяцев</span>
+              <span class="option-hint">Активно изучаю рынок</span>
+            </div>
+          </button>
+          <button class="option" onclick="selectOption(this, 'timing', 'Просматриваю варианты')">
+            <div class="option-text">
+              <span class="option-main">Просматриваю варианты</span>
+              <span class="option-hint">Пока на стадии изучения</span>
+            </div>
+          </button>
+        </div>
+        <div class="quiz-nav">
+          <button class="btn-back" onclick="goBack(2)">← Назад</button>
+          <span class="step-counter">3 / 4</span>
+          <button class="btn-next" id="next-3" disabled onclick="goNext(4)">Далее →</button>
+        </div>
+      </div>
+
+      <!-- Шаг 4 — контакты -->
+      <div class="step" id="step-4">
+        <p class="step-label">Шаг 4 из 4</p>
+        <h2 class="step-title">Почти готово!</h2>
+        <p class="step-sub">Оставьте контакт — мы подберём подходящие варианты и свяжемся с вами</p>
+        <div class="fgroup">
+          <label class="flabel">Ваше имя</label>
+          <input class="finput" id="qName" type="text">
+        </div>
+        <div class="fgroup">
+          <label class="flabel">Телефон</label>
+          <input class="finput" id="qPhone" type="tel" placeholder="+7 (___) ___-__-__" maxlength="18">
+        </div>
+        <div class="quiz-nav">
+          <button class="btn-back" onclick="goBack(3)">← Назад</button>
+          <span class="step-counter">4 / 4</span>
+          <button class="btn-next" id="next-4" onclick="submitQuiz()">Получить подборку</button>
+        </div>
+        <p class="fnote">Нажимая кнопку, вы соглашаетесь с <a href="/privacy" target="_blank">Политикой конфиденциальности</a></p>
+      </div>
+
+      <!-- Успех -->
+      <div class="step" id="step-success">
+        <div class="success">
+          <div class="success-ring">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <path d="M5 14l6 6L23 8" stroke="#b8965a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h2>Заявка отправлена!</h2>
+          <p>Мы получили ваши предпочтения и свяжемся с вами в ближайшее время с персональной подборкой квартир.</p>
+          <a href="/" class="btn-home">Вернуться к объектам</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<footer><p>© 2025 · Все права защищены</p></footer>
+
+<script>
+const answers = {};
+const totalSteps = 4;
+
+function selectOption(el, key, value) {
+  // Снимаем выделение с остальных в группе
+  el.closest('.options').querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  answers[key] = value;
+  // Активируем кнопку Далее
+  const stepNum = el.closest('.step').id.split('-')[1];
+  const nextBtn = document.getElementById('next-' + stepNum);
+  if (nextBtn) nextBtn.disabled = false;
+}
+
+function goNext(step) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-' + step).classList.add('active');
+  updateProgress(step);
+}
+
+function goBack(step) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-' + step).classList.add('active');
+  updateProgress(step);
+}
+
+function updateProgress(step) {
+  const pct = (step / totalSteps) * 100;
+  document.getElementById('progress').style.width = pct + '%';
+  window.scrollTo(0, 0);
+}
+
+// Маска телефона
+const qPhone = document.getElementById('qPhone');
+qPhone.addEventListener('input', function() {
+  let val = this.value.replace(/\D/g, '');
+  if (val.startsWith('8')) val = '7' + val.slice(1);
+  if (!val.startsWith('7')) val = '7' + val;
+  val = val.slice(0, 11);
+  let res = '+7';
+  if (val.length > 1) res += ' (' + val.slice(1, 4);
+  if (val.length >= 4) res += ') ' + val.slice(4, 7);
+  if (val.length >= 7) res += '-' + val.slice(7, 9);
+  if (val.length >= 9) res += '-' + val.slice(9, 11);
+  this.value = res;
+});
+qPhone.addEventListener('focus', function() {
+  if (!this.value) this.value = '+7 (';
+});
+
+async function submitQuiz() {
+  const name = document.getElementById('qName').value.trim();
+  const phone = document.getElementById('qPhone').value.trim();
+  if (!name || !phone || phone.length < 10) { alert('Заполните имя и телефон'); return; }
+
+  const btn = document.getElementById('next-4');
+  btn.disabled = true; btn.textContent = 'Отправляем...';
+
+  const note = `Квиз:\nКомнат: ${answers.rooms || '—'}\nБюджет: ${answers.budget || '—'}\nСроки: ${answers.timing || '—'}`;
+
+  try {
+    const r = await fetch('/submit-quiz', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, phone, note })
+    });
+    const d = await r.json();
+    if (d.success) {
+      document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+      document.getElementById('step-success').classList.add('active');
+      document.getElementById('progress').style.width = '100%';
+    } else {
+      alert('Ошибка, попробуйте ещё раз');
+      btn.disabled = false; btn.textContent = 'Получить подборку';
+    }
+  } catch(e) {
+    alert('Ошибка соединения');
+    btn.disabled = false; btn.textContent = 'Получить подборку';
+  }
+}
+</script>
+</body>
+</html>
