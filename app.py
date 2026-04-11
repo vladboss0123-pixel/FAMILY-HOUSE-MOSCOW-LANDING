@@ -19,7 +19,27 @@ AMO_STATUS_ID = 54235682    # 1. Новая заявка
 os.makedirs('data', exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+import random
+
+VIEWS_FILE = 'data/views.json'
+
+def load_views():
+    if not os.path.exists(VIEWS_FILE):
+        return {}
+    with open(VIEWS_FILE, 'r') as f:
+        return json.load(f)
+
+def save_views(views):
+    with open(VIEWS_FILE, 'w') as f:
+        json.dump(views, f)
+
+def get_views(apt_id):
+    views = load_views()
+    if apt_id not in views:
+        # Стартовое число — случайное от 50 до 200
+        views[apt_id] = random.randint(50, 200)
+        save_views(views)
+    return views[apt_id]
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -145,10 +165,25 @@ def submit_quiz():
     json.dump(logs, open(log_file, 'w'), ensure_ascii=False, indent=2)
     return jsonify({'success': True})
 
+@app.route('/view/<apt_id>', methods=['POST'])
+def track_view(apt_id):
+    views = load_views()
+    if apt_id not in views:
+        views[apt_id] = random.randint(50, 200)
+    views[apt_id] += 1
+    save_views(views)
+    return jsonify({'views': views[apt_id]})
+
 @app.route('/')
 def index():
     apartments = [a for a in load_apartments() if a.get('active', True)]
-    return render_template('index.html', apartments=apartments)
+    views = load_views()
+    # Инициализируем просмотры для новых квартир
+    for apt in apartments:
+        if apt['id'] not in views:
+            views[apt['id']] = random.randint(50, 200)
+    save_views(views)
+    return render_template('index.html', apartments=apartments, views=views)
 
 @app.route('/submit', methods=['POST'])
 def submit():

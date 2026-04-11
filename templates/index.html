@@ -67,6 +67,13 @@ header {
 .card-badge { position: absolute; top: 16px; left: 16px; background: var(--white); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); padding: 5px 12px; border-radius: 1px; font-weight: 500; z-index: 5; }
 
 .card-body { padding: 28px; }
+.card-views {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--muted); margin-bottom: 10px;
+  font-weight: 300;
+}
+.card-views svg { opacity: 0.5; flex-shrink: 0; }
+
 .card-title { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.2; margin-bottom: 8px; color: var(--ink); }
 
 /* METRO */
@@ -208,6 +215,10 @@ footer { border-top: 1px solid var(--border); padding: 28px 56px; text-align: ce
         <div class="card-badge">Новостройка</div>
       </div>
       <div class="card-body">
+        <div class="card-views" id="views-{{ apt.id }}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          {{ views.get(apt.id, 0) }} просмотров
+        </div>
         <h3 class="card-title">{{ apt.title }}</h3>
         {% if apt.metro_name %}
         <div class="card-metro">
@@ -290,7 +301,6 @@ footer { border-top: 1px solid var(--border); padding: 28px 56px; text-align: ce
       </div>
       <div id="mImgPlaceholder" class="modal-img-placeholder"></div>
       <div class="modal-body">
-        <p class="modal-eyebrow">Оставить заявку</p>
         <h3 class="modal-title" id="mTitle"></h3>
         <div id="mMetro" class="modal-metro" style="display:none">
           <div class="metro-dot" id="mMetroDot"></div>
@@ -368,6 +378,13 @@ let curApt = {};
 function openById(id) {
   const apt = APT_MAP[id];
   if (!apt) return;
+  // Трекаем просмотр
+  fetch(`/view/${id}`, { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      const el = document.getElementById('views-' + id);
+      if (el) el.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> ${d.views} просмотров`;
+    });
   openModal(apt);
 }
 
