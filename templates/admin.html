@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Админ-панель</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f5f2ed; --white: #fff; --ink: #1c1917;
+  --muted: #78716c; --border: #e5e0d8;
+  --gold: #b8965a; --danger: #b91c1c; --success: #15803d;
+}
+body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+
+header {
+  background: var(--ink); color: var(--white);
+  padding: 0 40px; height: 60px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo { font-family: 'Playfair Display', serif; font-size: 18px; }
+.nav { display: flex; gap: 28px; }
+.nav a { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 13px; letter-spacing: 0.06em; transition: color 0.2s; }
+.nav a:hover, .nav a.on { color: var(--gold); }
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 40px; }
+
+.page-h { font-family: 'Playfair Display', serif; font-size: 34px; font-weight: 400; margin-bottom: 32px; }
+
+/* ADD FORM */
+.card-form {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 2px; padding: 32px; margin-bottom: 40px;
+}
+.card-form h2 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 400; margin-bottom: 24px; }
+
+.fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.fg { display: flex; flex-direction: column; gap: 6px; }
+.fg.full { grid-column: 1 / -1; }
+.fl { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.fi, .ft {
+  padding: 11px 14px; border: 1px solid var(--border); border-radius: 1px;
+  font-family: 'Outfit', sans-serif; font-size: 14px; color: var(--ink);
+  background: var(--bg); outline: none; transition: border-color 0.2s;
+}
+.fi:focus, .ft:focus { border-color: var(--gold); }
+.ft { resize: vertical; min-height: 80px; }
+
+/* Photo upload zone */
+.upload-zone {
+  border: 2px dashed var(--border); border-radius: 2px;
+  padding: 24px; text-align: center; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+.upload-zone:hover, .upload-zone.drag { border-color: var(--gold); background: #fdf8f2; }
+.upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload-zone-text { font-size: 13px; color: var(--muted); }
+.upload-zone-text strong { color: var(--gold); }
+
+.photos-preview {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px;
+}
+.photo-thumb {
+  position: relative; width: 80px; height: 60px;
+}
+.photo-thumb img {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 1px;
+  border: 1px solid var(--border);
+}
+.photo-remove {
+  position: absolute; top: -6px; right: -6px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--danger); color: white; border: none;
+  font-size: 11px; cursor: pointer; line-height: 18px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.btn { padding: 12px 28px; border-radius: 1px; border: none; cursor: pointer; font-family: 'Outfit', sans-serif; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500; transition: all 0.2s; }
+.btn-dark { background: var(--ink); color: var(--white); }
+.btn-dark:hover { background: var(--gold); }
+.btn-outline { background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 8px 16px; font-size: 11px; }
+.btn-outline:hover { background: var(--danger); color: var(--white); }
+.btn-edit { background: transparent; color: var(--muted); border: 1px solid var(--border); padding: 8px 16px; font-size: 11px; }
+.btn-edit:hover { border-color: var(--gold); color: var(--gold); }
+
+/* LIST */
+.apt-list { display: flex; flex-direction: column; gap: 14px; }
+.apt-row {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 2px; padding: 18px 22px;
+  display: flex; align-items: center; gap: 18px;
+}
+.thumb { width: 76px; height: 56px; object-fit: cover; border-radius: 1px; border: 1px solid var(--border); flex-shrink: 0; }
+.thumb-ph { width: 76px; height: 56px; background: var(--bg); border-radius: 1px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 1px solid var(--border); }
+.apt-info { flex: 1; }
+.apt-name { font-family: 'Playfair Display', serif; font-size: 18px; margin-bottom: 3px; }
+.apt-meta { font-size: 12px; color: var(--muted); }
+.apt-price { font-size: 14px; font-weight: 500; margin-top: 3px; }
+.apt-actions { display: flex; gap: 8px; align-items: center; }
+
+.toggle { position: relative; width: 42px; height: 22px; display: inline-block; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; inset: 0; background: var(--border); border-radius: 22px; cursor: pointer; transition: 0.3s; }
+.slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; bottom: 3px; background: var(--white); border-radius: 50%; transition: 0.3s; }
+input:checked + .slider { background: var(--success); }
+input:checked + .slider::before { transform: translateX(20px); }
+
+.empty { text-align: center; padding: 60px; color: var(--muted); }
+.empty h3 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 300; color: var(--ink); margin-bottom: 8px; }
+
+/* TOAST */
+.toast {
+  position: fixed; bottom: 28px; right: 28px; z-index: 9999;
+  background: var(--ink); color: var(--white);
+  padding: 13px 22px; border-radius: 2px; font-size: 14px;
+  transform: translateY(60px); opacity: 0; transition: all 0.3s;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* EDIT MODAL */
+.edit-overlay {
+  position: fixed; inset: 0;
+  background: rgba(28,25,23,0.6); backdrop-filter: blur(4px);
+  z-index: 2000; display: flex; align-items: center; justify-content: center;
+  padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.25s;
+}
+.edit-overlay.open { opacity: 1; pointer-events: all; }
+.edit-modal {
+  background: var(--white); width: 100%; max-width: 640px;
+  border-radius: 2px; padding: 36px;
+  max-height: 90vh; overflow-y: auto;
+  transform: translateY(20px); transition: transform 0.25s;
+}
+.edit-overlay.open .edit-modal { transform: none; }
+.edit-modal h3 { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 400; margin-bottom: 24px; }
+.edit-actions { display: flex; gap: 12px; margin-top: 24px; justify-content: flex-end; }
+
+@media (max-width: 768px) {
+  .wrap { padding: 24px; }
+  .fgrid { grid-template-columns: 1fr; }
+  header { padding: 0 20px; }
+  .apt-row { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">Панель управления</span>
+  <nav class="nav">
+    <a href="/" target="_blank">Лендинг ↗</a>
+    <a href="/admin" class="on">Квартиры</a>
+    <a href="/admin/leads">Заявки</a>
+    <a href="/admin/logout">Выйти</a>
+  </nav>
+</header>
+
+<div class="wrap">
+  <h1 class="page-h">Квартиры</h1>
+
+  <!-- ADD FORM -->
+  <div class="card-form">
+    <h2>Добавить объект</h2>
+    <div class="fgrid">
+      <div class="fg"><label class="fl">Название / ЖК *</label><input class="fi" id="fTitle" placeholder="ЖК Dream Towers"></div>
+      <div class="fg"><label class="fl">Цена</label><input class="fi" id="fPrice" placeholder="28 000 000"></div>
+      <div class="fg"><label class="fl">Комнат</label><input class="fi" id="fRooms" placeholder="2"></div>
+      <div class="fg"><label class="fl">Площадь, м²</label><input class="fi" id="fArea" placeholder="65"></div>
+      <div class="fg"><label class="fl">Этаж</label><input class="fi" id="fFloor" placeholder="8/22"></div>
+      <div class="fg"><label class="fl">Метро</label><input class="fi" id="fMetroName" placeholder="Покровское"></div>
+      <div class="fg"><label class="fl">Цвет ветки метро</label>
+        <select class="fi" id="fMetroColor">
+          <option value="">— не указывать —</option>
+          <option value="#ef3124">Сокольническая (красная)</option>
+          <option value="#4baf4f">Замоскворецкая (зелёная)</option>
+          <option value="#0078bf">Арбатско-Покровская (синяя)</option>
+          <option value="#009bde">Филёвская (голубая)</option>
+          <option value="#884898">Кольцевая (фиолетовая)</option>
+          <option value="#f07e24">Калужско-Рижская (оранжевая)</option>
+          <option value="#8d6ca8">Таганско-Краснопресненская (сиреневая)</option>
+          <option value="#ffe400">Калининская (жёлтая)</option>
+          <option value="#a2b72b">Серпуховско-Тимирязевская (салатовая)</option>
+          <option value="#b5985a">Люблинско-Дмитровская (коричневая)</option>
+          <option value="#78c7c7">Большая Кольцевая (бирюзовая)</option>
+          <option value="#e696be">МЦД (розовая)</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Пешком до метро (мин)</label><input class="fi" id="fMetroWalk" placeholder="7"></div>
+      <div class="fg full"><label class="fl">Описание объекта</label><textarea class="ft" id="fDesc" placeholder="Светлая квартира с видом на парк, современная отделка..."></textarea></div>
+      <div class="fg full">
+        <label class="fl">Фотографии</label>
+        <div class="upload-zone" id="dropZone">
+          <input type="file" id="fileInput" multiple accept="image/*" onchange="handleFiles(this.files)">
+          <div class="upload-zone-text">
+            <strong>Нажмите для выбора</strong> или перетащите фото сюда<br>
+            <span style="font-size:12px">JPG, PNG, WEBP</span>
+          </div>
+        </div>
+        <div class="photos-preview" id="preview"></div>
+      </div>
+      <div class="fg full" style="margin-top:8px">
+        <button class="btn btn-dark" onclick="addApt()">Добавить квартиру</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIST -->
+  <h2 style="font-family:'Playfair Display',serif; font-size:22px; font-weight:400; margin-bottom:20px;">
+    Все объекты <span style="font-size:16px; color:var(--muted); font-family:'Outfit',sans-serif;">({{ apartments|length }})</span>
+  </h2>
+
+  {% if apartments %}
+  <div class="apt-list">
+    {% for apt in apartments %}
+    <div class="apt-row" id="row-{{ apt.id }}">
+      {% if apt.images %}
+      <img class="thumb" src="{{ apt.images[0] }}" alt="">
+      {% else %}
+      <div class="thumb-ph">🏢</div>
+      {% endif %}
+      <div class="apt-info">
+        <div class="apt-name">{{ apt.title }}</div>
+        <div class="apt-meta">{{ apt.address }}{% if apt.rooms %} · {{ apt.rooms }} комн.{% endif %}{% if apt.area %} · {{ apt.area }} м²{% endif %}{% if apt.floor %} · {{ apt.floor }} эт.{% endif %}</div>
+        <div class="apt-price" data-price="{{ apt.price }}"></div>
+      </div>
+      <div class="apt-actions">
+        <label class="toggle" title="Показывать на сайте">
+          <input type="checkbox" {% if apt.active %}checked{% endif %} onchange="toggleActive('{{ apt.id }}', this.checked)">
+          <span class="slider"></span>
+        </label>
+        <button class="btn btn-edit" onclick="openEdit('{{ apt.id }}')">Изменить</button>
+        <button class="btn btn-outline" onclick="deleteApt('{{ apt.id }}', '{{ apt.title }}')">Удалить</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <h3>Квартир пока нет</h3>
+    <p>Добавьте первую квартиру через форму выше</p>
+  </div>
+  {% endif %}
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- EDIT MODAL -->
+<div class="edit-overlay" id="editOverlay" onclick="closeEditBg(event)">
+  <div class="edit-modal">
+    <h3>Редактировать объект</h3>
+    <input type="hidden" id="eId">
+    <div class="fgrid">
+      <div class="fg"><label class="fl">Название / ЖК</label><input class="fi" id="eTitle"></div>
+      <div class="fg"><label class="fl">Цена</label><input class="fi" id="ePrice"></div>
+      <div class="fg"><label class="fl">Комнат</label><input class="fi" id="eRooms"></div>
+      <div class="fg"><label class="fl">Площадь, м²</label><input class="fi" id="eArea"></div>
+      <div class="fg"><label class="fl">Этаж</label><input class="fi" id="eFloor"></div>
+      <div class="fg"><label class="fl">Метро</label><input class="fi" id="eMetroName"></div>
+      <div class="fg"><label class="fl">Цвет ветки</label>
+        <select class="fi" id="eMetroColor">
+          <option value="">— не указывать —</option>
+          <option value="#ef3124">Сокольническая (красная)</option>
+          <option value="#4baf4f">Замоскворецкая (зелёная)</option>
+          <option value="#0078bf">Арбатско-Покровская (синяя)</option>
+          <option value="#009bde">Филёвская (голубая)</option>
+          <option value="#884898">Кольцевая (фиолетовая)</option>
+          <option value="#f07e24">Калужско-Рижская (оранжевая)</option>
+          <option value="#8d6ca8">Таганско-Краснопресненская (сиреневая)</option>
+          <option value="#ffe400">Калининская (жёлтая)</option>
+          <option value="#a2b72b">Серпуховско-Тимирязевская (салатовая)</option>
+          <option value="#b5985a">Люблинско-Дмитровская (коричневая)</option>
+          <option value="#78c7c7">Большая Кольцевая (бирюзовая)</option>
+          <option value="#e696be">МЦД (розовая)</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Пешком (мин)</label><input class="fi" id="eMetroWalk"></div>
+      <div class="fg full"><label class="fl">Описание</label><textarea class="ft" id="eDesc"></textarea></div>
+      <div class="fg full">
+        <label class="fl">Добавить фото</label>
+        <div class="upload-zone">
+          <input type="file" id="eFileInput" multiple accept="image/*" onchange="handleEditFiles(this.files)">
+          <div class="upload-zone-text"><strong>Нажмите для выбора</strong> или перетащите фото</div>
+        </div>
+        <div class="photos-preview" id="ePreview"></div>
+      </div>
+    </div>
+    <div class="edit-actions">
+      <button class="btn btn-edit" onclick="closeEdit()">Отмена</button>
+      <button class="btn btn-dark" onclick="saveEdit()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const APTS = {{ apartments|tojson }};
+const APT_MAP = {};
+APTS.forEach(a => APT_MAP[a.id] = a);
+
+// ── Подсветка цвета метро в селекте ────────
+function updateMetroSelectColor(sel) {
+  sel.style.borderLeft = sel.value ? `4px solid ${sel.value}` : '';
+}
+['fMetroColor', 'eMetroColor'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener('change', () => updateMetroSelectColor(el));
+    updateMetroSelectColor(el);
+  }
+});
+
+// ── Форматирование цен ──────────────────────
+function formatPrice(raw) {
+  if (!raw) return '';
+  const digits = String(raw).replace(/\D/g, '');
+  if (!digits) return raw;
+  return parseInt(digits).toLocaleString('ru-RU') + ' ₽';
+}
+document.querySelectorAll('.apt-price[data-price]').forEach(el => {
+  el.textContent = formatPrice(el.dataset.price);
+});
+
+// ── Toast ───────────────────────────────────
+function toast(msg, ms=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// ── Загрузка фото (форма добавления) ───────
+let addedImages = [];
+
+async function handleFiles(files) {
+  for (const file of files) {
+    const url = await uploadFile(file);
+    if (url) { addedImages.push(url); renderPreview(); }
+  }
+}
+
+async function uploadFile(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const r = await fetch('/admin/upload', { method: 'POST', body: fd });
+  const d = await r.json();
+  return d.success ? d.url : null;
+}
+
+function renderPreview() {
+  const p = document.getElementById('preview');
+  p.innerHTML = addedImages.map((url, i) => `
+    <div class="photo-thumb">
+      <img src="${url}" alt="">
+      <button class="photo-remove" onclick="removeImg(${i})">×</button>
+    </div>`).join('');
+}
+
+function removeImg(i) {
+  addedImages.splice(i, 1); renderPreview();
+}
+
+// ── Drag & drop ─────────────────────────────
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  handleFiles(e.dataTransfer.files);
+});
+
+// ── Добавить квартиру ───────────────────────
+async function addApt() {
+  const title = document.getElementById('fTitle').value.trim();
+  if (!title) { alert('Введите название'); return; }
+  const data = {
+    title, images: addedImages,
+    price: document.getElementById('fPrice').value.trim(),
+    rooms: document.getElementById('fRooms').value.trim(),
+    area: document.getElementById('fArea').value.trim(),
+    floor: document.getElementById('fFloor').value.trim(),
+    description: document.getElementById('fDesc').value.trim(),
+    metro_name: document.getElementById('fMetroName').value.trim(),
+    metro_color: document.getElementById('fMetroColor').value,
+    metro_walk: document.getElementById('fMetroWalk').value.trim(),
+  };
+  const r = await fetch('/admin/add', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+  const d = await r.json();
+  if (d.success) { toast('Квартира добавлена!'); setTimeout(() => location.reload(), 700); }
+}
+
+// ── Показывать/скрывать ─────────────────────
+async function toggleActive(id, active) {
+  await fetch(`/admin/update/${id}`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ active })
+  });
+  toast(active ? 'Показывается на сайте' : 'Скрыто с сайта');
+}
+
+// ── Удалить ─────────────────────────────────
+async function deleteApt(id, title) {
+  if (!confirm(`Удалить "${title}"?`)) return;
+  const r = await fetch(`/admin/delete/${id}`, { method: 'POST' });
+  const d = await r.json();
+  if (d.success) { document.getElementById(`row-${id}`).remove(); toast('Удалено'); }
+}
+
+// ── Редактировать ───────────────────────────
+let editImages = [];
+let editId = '';
+
+function openEdit(id) {
+  const apt = APT_MAP[id];
+  if (!apt) return;
+  editId = apt.id;
+  editImages = apt.images ? [...apt.images] : [];
+  document.getElementById('eTitle').value = apt.title || '';
+  document.getElementById('ePrice').value = apt.price || '';
+  document.getElementById('eRooms').value = apt.rooms || '';
+  document.getElementById('eArea').value = apt.area || '';
+  document.getElementById('eFloor').value = apt.floor || '';
+  document.getElementById('eDesc').value = apt.description || '';
+  document.getElementById('eMetroName').value = apt.metro_name || '';
+  document.getElementById('eMetroColor').value = apt.metro_color || '';
+  document.getElementById('eMetroWalk').value = apt.metro_walk || '';
+  renderEditPreview();
+  document.getElementById('editOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeEdit() {
+  document.getElementById('editOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function closeEditBg(e) {
+  if (e.target === document.getElementById('editOverlay')) closeEdit();
+}
+
+async function handleEditFiles(files) {
+  for (const file of files) {
+    const url = await uploadFile(file);
+    if (url) { editImages.push(url); renderEditPreview(); }
+  }
+}
+
+function renderEditPreview() {
+  const p = document.getElementById('ePreview');
+  p.innerHTML = editImages.map((url, i) => `
+    <div class="photo-thumb">
+      <img src="${url}" alt="">
+      <button class="photo-remove" onclick="removeEditImg(${i})">×</button>
+    </div>`).join('');
+}
+
+function removeEditImg(i) { editImages.splice(i, 1); renderEditPreview(); }
+
+async function saveEdit() {
+  const data = {
+    title: document.getElementById('eTitle').value.trim(),
+    price: document.getElementById('ePrice').value.trim(),
+    rooms: document.getElementById('eRooms').value.trim(),
+    area: document.getElementById('eArea').value.trim(),
+    floor: document.getElementById('eFloor').value.trim(),
+    description: document.getElementById('eDesc').value.trim(),
+    metro_name: document.getElementById('eMetroName').value.trim(),
+    metro_color: document.getElementById('eMetroColor').value,
+    metro_walk: document.getElementById('eMetroWalk').value.trim(),
+    images: editImages
+  };
+  const r = await fetch(`/admin/update/${editId}`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  const d = await r.json();
+  if (d.success) { toast('Сохранено!'); setTimeout(() => location.reload(), 700); closeEdit(); }
+}
+</script>
+</body>
+</html>

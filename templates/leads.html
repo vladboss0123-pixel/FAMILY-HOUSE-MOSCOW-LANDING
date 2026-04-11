@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Заявки</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --cream: #f8f6f1; --white: #fff; --charcoal: #1a1a1a; --warm-gray: #8a8580; --light-gray: #e8e5df; --accent: #c4a882; --accent-dark: #9e7d5a; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--charcoal); }
+  header { background: var(--charcoal); color: var(--white); padding: 18px 40px; display: flex; align-items: center; justify-content: space-between; }
+  .logo { font-family: 'Cormorant Garamond', serif; font-size: 20px; }
+  .header-nav { display: flex; gap: 24px; }
+  .header-nav a { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 13px; letter-spacing: 0.08em; }
+  .header-nav a:hover, .header-nav a.active { color: var(--accent); }
+  .container { max-width: 1000px; margin: 0 auto; padding: 40px; }
+  .page-title { font-family: 'Cormorant Garamond', serif; font-size: 36px; font-weight: 400; margin-bottom: 32px; }
+  table { width: 100%; border-collapse: collapse; background: var(--white); border: 1px solid var(--light-gray); border-radius: 4px; overflow: hidden; }
+  th { background: var(--charcoal); color: var(--white); padding: 14px 20px; text-align: left; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 400; }
+  td { padding: 16px 20px; border-bottom: 1px solid var(--light-gray); font-size: 14px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--cream); }
+  .apt-tag { display: inline-block; background: #f0ebe3; color: var(--accent-dark); padding: 3px 10px; border-radius: 20px; font-size: 12px; }
+  .empty { text-align: center; padding: 60px; color: var(--warm-gray); }
+  .empty h3 { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 300; margin-bottom: 8px; color: var(--charcoal); }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">Панель управления</span>
+  <nav class="header-nav">
+    <a href="/" target="_blank">Лендинг ↗</a>
+    <a href="/admin">Квартиры</a>
+    <a href="/admin/leads" class="active">Заявки</a>
+    <a href="/admin/logout">Выйти</a>
+  </nav>
+</header>
+<div class="container">
+  <h1 class="page-title">Заявки ({{ leads|length }})</h1>
+  {% if leads %}
+  <table>
+    <thead>
+      <tr>
+        <th>Дата</th>
+        <th>Имя</th>
+        <th>Телефон</th>
+        <th>Квартира</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lead in leads %}
+      <tr>
+        <td style="color: var(--warm-gray); font-size: 13px;">{{ lead.time[:16].replace('T', ' ') }}</td>
+        <td><strong>{{ lead.name }}</strong></td>
+        <td><a href="tel:{{ lead.phone }}" style="color: var(--accent-dark); text-decoration: none;">{{ lead.phone }}</a></td>
+        <td><span class="apt-tag">{{ lead.apartment }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">
+    <h3>Заявок пока нет</h3>
+    <p>Они появятся здесь когда пользователи начнут оставлять контакты</p>
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>

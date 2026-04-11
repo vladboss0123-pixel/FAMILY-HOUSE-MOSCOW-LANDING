@@ -1,0 +1,41 @@
+[
+  {
+    "id": "94746c4c",
+    "title": "Видовая евродвушка",
+    "address": "Москва, ул. Покрышкина д. 11",
+    "price": "14000000",
+    "rooms": "2",
+    "area": "65",
+    "floor": "11/15",
+    "description": "крутая хата",
+    "images": [
+      "/static/uploads/5c8a6ce974cd49e3ad9587b093a533f5.png",
+      "/static/uploads/670663bbe5914f67b1c322fb5e160e46.png"
+    ],
+    "active": true,
+    "created_at": "2026-04-10T14:16:32.050880",
+    "metro_name": "Юго-Западная",
+    "metro_color": "#ef3124",
+    "metro_walk": "10"
+  },
+  {
+    "id": "8e088af9",
+    "title": "Лучшая квартира цена/качество",
+    "address": "",
+    "price": "",
+    "rooms": "1",
+    "area": "45",
+    "floor": "11/25",
+    "description": "Комфортная квартира с евроремонтом в 10 минутах от Остоженки",
+    "images": [
+      "/static/uploads/29e208a77a704e1dab90c507e179fdb5.png",
+      "/static/uploads/3f032d9530774744a9f448709db6459f.png",
+      "/static/uploads/fa287173a9f44dce8c2eae5964ad5f9f.png"
+    ],
+    "active": true,
+    "created_at": "2026-04-10T16:50:59.568974",
+    "metro_name": "Арбатская",
+    "metro_color": "#0078bf",
+    "metro_walk": "7"
+  }
+]
