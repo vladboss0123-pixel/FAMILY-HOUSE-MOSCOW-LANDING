@@ -101,6 +101,23 @@ header {
 .empty { text-align: center; padding: 100px 20px; color: var(--muted); }
 .empty h3 { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 300; margin-bottom: 12px; color: var(--ink); }
 
+/* ── FILTERS ── */
+.filters { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; align-items: flex-end; }
+.filter-group { display: flex; flex-direction: column; gap: 6px; }
+.filter-label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.filter-select { padding: 10px 14px; border: 1px solid var(--border); border-radius: 1px; font-family: 'Outfit', sans-serif; font-size: 14px; color: var(--ink); background: var(--white); outline: none; cursor: pointer; transition: border-color 0.2s; min-width: 160px; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2378716c' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+.filter-select:focus { border-color: var(--gold); }
+.filter-select.active { border-color: var(--gold); color: var(--ink); }
+.filter-range { display: flex; align-items: center; gap: 6px; }
+.filter-range-sep { font-size: 13px; color: var(--muted); }
+.filter-num { padding: 10px 12px; border: 1px solid var(--border); border-radius: 1px; font-family: 'Outfit', sans-serif; font-size: 14px; color: var(--ink); background: var(--white); outline: none; width: 90px; transition: border-color 0.2s; }
+.filter-num:focus { border-color: var(--gold); }
+.filter-reset { padding: 10px 18px; background: transparent; border: 1px solid var(--border); border-radius: 1px; font-family: 'Outfit', sans-serif; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); cursor: pointer; transition: all 0.2s; align-self: flex-end; }
+.filter-reset:hover { border-color: var(--gold); color: var(--gold); }
+.filter-found { font-size: 13px; color: var(--muted); align-self: flex-end; padding-bottom: 11px; margin-left: auto; }
+.no-results { text-align: center; padding: 60px 20px; color: var(--muted); display: none; }
+.no-results h3 { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 300; color: var(--ink); margin-bottom: 8px; }
+
 /* MODAL */
 .overlay { position: fixed; inset: 0; background: rgba(28,25,23,0.6); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
 .overlay.open { opacity: 1; pointer-events: all; }
@@ -184,7 +201,51 @@ footer { border-top: 1px solid var(--border); padding: 28px 56px; text-align: ce
   </div>
 
   {% if apartments %}
-  <div class="grid">
+  <!-- ФИЛЬТРЫ -->
+  <div class="filters">
+    <div class="filter-group">
+      <label class="filter-label">Комнат</label>
+      <select class="filter-select" id="fRooms" onchange="applyFilters()">
+        <option value="">Любое</option>
+        <option value="1">1 комната</option>
+        <option value="2">2 комнаты</option>
+        <option value="3">3 комнаты</option>
+        <option value="4">4+ комнаты</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Метро</label>
+      <select class="filter-select" id="fMetro" onchange="applyFilters()">
+        <option value="">Любое</option>
+        {% set metros = [] %}
+        {% for apt in apartments %}
+          {% if apt.metro_name and apt.metro_name not in metros %}
+            {% set _ = metros.append(apt.metro_name) %}
+          {% endif %}
+        {% endfor %}
+        {% for metro in metros %}
+        <option value="{{ metro }}">{{ metro }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Площадь, м²</label>
+      <div class="filter-range">
+        <input class="filter-num" id="fAreaMin" type="number" placeholder="от" oninput="applyFilters()">
+        <span class="filter-range-sep">—</span>
+        <input class="filter-num" id="fAreaMax" type="number" placeholder="до" oninput="applyFilters()">
+      </div>
+    </div>
+    <button class="filter-reset" onclick="resetFilters()">Сбросить</button>
+    <span class="filter-found" id="filterFound"></span>
+  </div>
+
+  <div class="no-results" id="noResults">
+    <h3>Ничего не найдено</h3>
+    <p>Попробуйте изменить параметры фильтров</p>
+  </div>
+
+  <div class="grid" id="aptGrid">
     {% for apt in apartments %}
     <div class="card" data-id="{{ apt.id }}" onclick="openById(this.dataset.id)">
       <div class="card-carousel" id="carousel-{{ apt.id }}">
@@ -343,7 +404,69 @@ const APTS = {{ apartments|tojson }};
 const APT_MAP = {};
 APTS.forEach(a => APT_MAP[a.id] = a);
 
-// ── Карусель карточки ──────────────────────
+// ── Фильтры ───────────────────────────────
+function applyFilters() {
+  const rooms = document.getElementById('fRooms').value;
+  const metro = document.getElementById('fMetro').value;
+  const areaMin = parseFloat(document.getElementById('fAreaMin').value) || 0;
+  const areaMax = parseFloat(document.getElementById('fAreaMax').value) || Infinity;
+
+  const cards = document.querySelectorAll('#aptGrid .card');
+  let visible = 0;
+
+  cards.forEach(card => {
+    const id = card.dataset.id;
+    const apt = APT_MAP[id];
+    if (!apt) return;
+
+    const aptRooms = parseInt(apt.rooms) || 0;
+    const aptArea = parseFloat(apt.area) || 0;
+    const aptMetro = apt.metro_name || '';
+
+    let show = true;
+
+    if (rooms) {
+      const r = parseInt(rooms);
+      if (r === 4) { if (aptRooms < 4) show = false; }
+      else { if (aptRooms !== r) show = false; }
+    }
+    if (metro && aptMetro !== metro) show = false;
+    if (areaMin && aptArea < areaMin) show = false;
+    if (areaMax !== Infinity && aptArea > areaMax) show = false;
+
+    card.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  // Подсветка активных фильтров
+  ['fRooms', 'fMetro'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.toggle('active', el.value !== '');
+  });
+
+  // Счётчик
+  const found = document.getElementById('filterFound');
+  const noResults = document.getElementById('noResults');
+  const total = cards.length;
+  if (rooms || metro || areaMin || areaMax !== Infinity) {
+    found.textContent = `Найдено: ${visible}`;
+    noResults.style.display = visible === 0 ? 'block' : 'none';
+  } else {
+    found.textContent = '';
+    noResults.style.display = 'none';
+  }
+}
+
+function resetFilters() {
+  document.getElementById('fRooms').value = '';
+  document.getElementById('fMetro').value = '';
+  document.getElementById('fAreaMin').value = '';
+  document.getElementById('fAreaMax').value = '';
+  document.querySelectorAll('.filter-select').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('#aptGrid .card').forEach(c => c.style.display = '');
+  document.getElementById('filterFound').textContent = '';
+  document.getElementById('noResults').style.display = 'none';
+}
 const carouselState = {};
 function slideCarousel(id, dir) {
   const apt = APT_MAP[id];
