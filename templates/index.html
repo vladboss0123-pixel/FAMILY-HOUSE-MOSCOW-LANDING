@@ -519,15 +519,16 @@ function openModal(apt) {
   const ph = document.getElementById('mImgPlaceholder');
   modalSlide = 0;
   if (apt.images && apt.images.length > 0) {
-    track.innerHTML = apt.images.map(url => `<div class="modal-carousel-slide"><img src="${url}" alt=""></div>`).join('');
+    // Показываем только первое фото без слайдера
+    track.innerHTML = `<div class="modal-carousel-slide"><img src="${apt.images[0]}" alt=""></div>`;
     track.style.transform = 'translateX(0)';
-    modalTotal = apt.images.length;
-    carousel.style.display = apt.images.length > 0 ? 'block' : 'none';
+    modalTotal = 1;
+    carousel.style.display = 'block';
     ph.style.display = 'none';
     const prevBtn = carousel.querySelector('.modal-carousel-prev');
     const nextBtn = carousel.querySelector('.modal-carousel-next');
-    if (prevBtn) prevBtn.style.display = apt.images.length > 1 ? 'flex' : 'none';
-    if (nextBtn) nextBtn.style.display = apt.images.length > 1 ? 'flex' : 'none';
+    if (prevBtn) prevBtn.style.display = 'none';
+    if (nextBtn) nextBtn.style.display = 'none';
   } else {
     carousel.style.display = 'none';
     ph.style.display = 'block';
