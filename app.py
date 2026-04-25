@@ -25,6 +25,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'realty-secret-2024')
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
+IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', '')
 AMO_DOMAIN = os.environ.get('AMO_DOMAIN', 'laresgroup.amocrm.ru')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 AMO_TOKEN = os.environ.get('AMO_TOKEN', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6IjQ2N2VjY2ViZTAzZmQzY2RiMDBjNmQxMTY4MGNhNmVkNWQ4NjI2MTBjNDgxZmFhM2QyZjdiYzMzYzlhNTRmYjgyZGUyMzQ1NzJlMzA5YTQxIn0.eyJhdWQiOiI0ZjBhMjNhYy01NzI0LTQ0Y2ItOGQ0ZC0xNmQ4ZmQxNjc3MzkiLCJqdGkiOiI0NjdlY2NlYmUwM2ZkM2NkYjAwYzZkMTE2ODBjYTZlZDVkODYyNjEwYzQ4MWZhYTNkMmY3YmMzM2M5YTU0ZmI4MmRlMjM0NTcyZTMwOWE0MSIsImlhdCI6MTc3NTgyNDkxNCwibmJmIjoxNzc1ODI0OTE0LCJleHAiOjE3NzgzNzEyMDAsInN1YiI6IjkwOTgyMzAiLCJncmFudF90eXBlIjoiIiwiYWNjb3VudF9pZCI6MzA3Nzk2MzAsImJhc2VfZG9tYWluIjoiYW1vY3JtLnJ1IiwidmVyc2lvbiI6Miwic2NvcGVzIjpbInB1c2hfbm90aWZpY2F0aW9ucyIsImZpbGVzIiwiY3JtIiwiZmlsZXNfZGVsZXRlIiwibm90aWZpY2F0aW9ucyJdLCJoYXNoX3V1aWQiOiJjZTM4Yjc1Ny0yODBjLTRkMDItYjIzOC0xZmY4ZWE4NTBhY2YiLCJhcGlfZG9tYWluIjoiYXBpLWIuYW1vY3JtLnJ1In0.Vd8R5c5usJ2sOoEqmS8qQgyJfNs3B2gFQ3o4IWym5gmUCKXiEqEDvodBEwlj4-y1xMlaVB4vuz3Bkaj2Gpsf-WKQy9OTbzRVU8lir9gKfj_eJ52ZIokpySiL0pKEy6bFeJXOjkhg2We6ZIy3voYCSvuTzDqD2pyKmhFX06O1PkJepvfUX4la2NN0385Ebh9T686gv54t1QIsRhgaOvKg1UXaiDCQMMLi70AdoPP4p_56HNZbbCiUWUG0fMyB87dyCX3NCurzlRUFGwP_sFncZDQxko3ueNUXpeI2t4-o6qaSDkPErqtZ3yEz4AUX9Vkg2_9ht2n6O5uSGsF6aNrIGQ')
@@ -536,6 +537,90 @@ def generate_covered_text(apt_id):
         return jsonify({'success': True, 'text': response.text.strip()})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+def check_api_key():
+    key = request.headers.get('X-Api-Key') or request.json.get('api_key', '') if request.is_json else request.headers.get('X-Api-Key', '')
+    if not IMPORT_API_KEY or key != IMPORT_API_KEY:
+        return False
+    return True
+
+@app.route('/api/upload', methods=['POST'])
+def api_upload():
+    if not check_api_key():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    f = request.files.get('file')
+    if not f or not allowed_file(f.filename):
+        return jsonify({'success': False, 'error': 'Неверный формат'})
+    ext = f.filename.rsplit('.', 1)[1].lower()
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    f.save(os.path.join(UPLOAD_FOLDER, filename))
+    return jsonify({'success': True, 'url': f"/static/uploads/{filename}"})
+
+@app.route('/api/import', methods=['POST'])
+def api_import():
+    """
+    n8n отправляет сюда готовые данные квартиры.
+
+    Тело запроса (JSON):
+    {
+      "api_key": "...",          // или в заголовке X-Api-Key
+      "title": "...",
+      "description": "...",      // уже переписанный Gemini текст
+      "rooms": "2",
+      "area": "65",
+      "floor": "8/22",
+      "metro_name": "ЦСКА",
+      "metro_color": "#ef3124",  // опционально, можно не передавать
+      "metro_walk": "5",
+      "images": ["https://...", "https://..."],   // URL фото для сайта
+      "covered_image": "https://..."              // URL covered для соцсетей
+    }
+    """
+    if not check_api_key():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    data = request.json
+    apt_id = str(uuid.uuid4())[:8]
+
+    # Автоопределение цвета ветки если не передан
+    metro_color = data.get('metro_color', '')
+    if not metro_color and data.get('metro_name'):
+        metro_color = ''  # фронтенд подставит через METRO_MAP
+
+    if USE_DB:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO apartments (id, title, address, price, rooms, area, floor, description,
+                images, covered_image, active, created_at, metro_name, metro_color, metro_walk)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,NOW(),%s,%s,%s)
+        ''', (
+            apt_id,
+            data.get('title', ''), data.get('address', ''), '',
+            data.get('rooms', ''), data.get('area', ''), data.get('floor', ''),
+            data.get('description', ''), json.dumps(data.get('images', [])),
+            data.get('covered_image', ''),
+            data.get('metro_name', ''), metro_color, data.get('metro_walk', ''),
+        ))
+        conn.commit()
+        cur.close()
+        conn.close()
+    else:
+        apt = {
+            'id': apt_id, 'title': data.get('title', ''), 'address': data.get('address', ''),
+            'price': '', 'rooms': data.get('rooms', ''), 'area': data.get('area', ''),
+            'floor': data.get('floor', ''), 'description': data.get('description', ''),
+            'images': data.get('images', []), 'covered_image': data.get('covered_image', ''),
+            'active': True, 'created_at': datetime.now().isoformat(),
+            'metro_name': data.get('metro_name', ''), 'metro_color': metro_color,
+            'metro_walk': data.get('metro_walk', ''),
+        }
+        apts = load_apartments()
+        apts.append(apt)
+        save_apartments_json(apts)
+
+    apt = get_apartment(apt_id)
+    return jsonify({'success': True, 'apt': apt})
 
 @app.route('/admin/leads')
 def admin_leads():
