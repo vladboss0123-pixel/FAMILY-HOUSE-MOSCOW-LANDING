@@ -59,6 +59,22 @@ header {
 .upload-zone-text { font-size: 13px; color: var(--muted); }
 .upload-zone-text strong { color: var(--gold); }
 
+.covered-zone {
+  border: 2px dashed #f0a070; border-radius: 2px;
+  padding: 16px; text-align: center; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative; background: #fffaf6;
+}
+.covered-zone:hover, .covered-zone.drag { border-color: #e07040; background: #fff3ec; }
+.covered-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.covered-label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #e07040; margin-bottom: 4px; display: block; }
+.covered-note { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.covered-preview { position: relative; width: 100px; height: 56px; margin-top: 10px; display: inline-block; }
+.covered-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 1px; border: 1px solid #f0a070; }
+.covered-remove { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--danger); color: white; border: none; font-size: 11px; cursor: pointer; line-height: 18px; display: flex; align-items: center; justify-content: center; }
+.covered-download { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: #f0a070; color: white; border-radius: 1px; border: none; font-family: 'Outfit', sans-serif; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; text-decoration: none; transition: background 0.2s; margin-top: 8px; }
+.covered-download:hover { background: #e07040; }
+
 .photos-preview {
   display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px;
 }
@@ -164,12 +180,11 @@ input:checked + .slider::before { transform: translateX(20px); }
   <div class="card-form">
     <h2>Добавить объект</h2>
     <div class="fgrid">
-      <div class="fg"><label class="fl">Название / ЖК *</label><input class="fi" id="fTitle" placeholder="ЖК Dream Towers"></div>
-      <div class="fg"><label class="fl">Цена</label><input class="fi" id="fPrice" placeholder="28 000 000"></div>
+      <div class="fg full"><label class="fl">Заголовок *</label><input class="fi" id="fTitle" placeholder="ЖК Dream Towers"></div>
       <div class="fg"><label class="fl">Комнат</label><input class="fi" id="fRooms" placeholder="2"></div>
       <div class="fg"><label class="fl">Площадь, м²</label><input class="fi" id="fArea" placeholder="65"></div>
       <div class="fg"><label class="fl">Этаж</label><input class="fi" id="fFloor" placeholder="8/22"></div>
-      <div class="fg"><label class="fl">Метро</label><input class="fi" id="fMetroName" placeholder="Покровское"></div>
+      <div class="fg"><label class="fl">Метро</label><input class="fi" id="fMetroName" placeholder="Сокольники" list="metroSuggestions" oninput="autoMetroColor('fMetroColor', this.value)" onchange="autoMetroColor('fMetroColor', this.value)"></div>
       <div class="fg"><label class="fl">Цвет ветки метро</label>
         <select class="fi" id="fMetroColor">
           <option value="">— не указывать —</option>
@@ -177,28 +192,41 @@ input:checked + .slider::before { transform: translateX(20px); }
           <option value="#4baf4f">Замоскворецкая (зелёная)</option>
           <option value="#0078bf">Арбатско-Покровская (синяя)</option>
           <option value="#009bde">Филёвская (голубая)</option>
-          <option value="#884898">Кольцевая (фиолетовая)</option>
+          <option value="#7a4b3a">Кольцевая (коричневая)</option>
           <option value="#f07e24">Калужско-Рижская (оранжевая)</option>
-          <option value="#8d6ca8">Таганско-Краснопресненская (сиреневая)</option>
+          <option value="#8d6ca8">Таганско-Краснопресненская (фиолетовая)</option>
           <option value="#ffe400">Калининская (жёлтая)</option>
-          <option value="#a2b72b">Серпуховско-Тимирязевская (салатовая)</option>
-          <option value="#b5985a">Люблинско-Дмитровская (коричневая)</option>
+          <option value="#9e9e9e">Серпуховско-Тимирязевская (серая)</option>
+          <option value="#bdbe00">Люблинско-Дмитровская (жёлто-зелёная)</option>
           <option value="#78c7c7">Большая Кольцевая (бирюзовая)</option>
+          <option value="#cf4785">Некрасовская (малиновая)</option>
+          <option value="#f0811e">МЦК (оранжево-красная)</option>
           <option value="#e696be">МЦД (розовая)</option>
         </select>
       </div>
       <div class="fg"><label class="fl">Пешком до метро (мин)</label><input class="fi" id="fMetroWalk" placeholder="7"></div>
       <div class="fg full"><label class="fl">Описание объекта</label><textarea class="ft" id="fDesc" placeholder="Светлая квартира с видом на парк, современная отделка..."></textarea></div>
       <div class="fg full">
-        <label class="fl">Фотографии</label>
+        <label class="fl">Фото для сайта <span style="color:var(--gold)">(без надписей)</span></label>
         <div class="upload-zone" id="dropZone">
           <input type="file" id="fileInput" multiple accept="image/*" onchange="handleFiles(this.files)">
           <div class="upload-zone-text">
             <strong>Нажмите для выбора</strong> или перетащите фото сюда<br>
-            <span style="font-size:12px">JPG, PNG, WEBP</span>
+            <span style="font-size:12px">JPG, PNG, WEBP — чистые фото без надписей</span>
           </div>
         </div>
         <div class="photos-preview" id="preview"></div>
+      </div>
+      <div class="fg full">
+        <span class="covered-label">Covered для соцсетей (Instagram / TikTok)</span>
+        <div class="covered-zone" id="fCoveredZone">
+          <input type="file" id="fCoveredInput" accept="image/*" onchange="handleCoveredFile(this.files[0], 'f')">
+          <div class="upload-zone-text" style="font-size:12px">
+            <strong style="color:#e07040">Загрузить covered</strong> — не публикуется на сайте<br>
+            <span style="font-size:11px">Одно изображение с текстом/надписями</span>
+          </div>
+        </div>
+        <div id="fCoveredPreview"></div>
       </div>
       <div class="fg full" style="margin-top:8px">
         <button class="btn btn-dark" onclick="addApt()">Добавить квартиру</button>
@@ -223,7 +251,6 @@ input:checked + .slider::before { transform: translateX(20px); }
       <div class="apt-info">
         <div class="apt-name">{{ apt.title }}</div>
         <div class="apt-meta">{{ apt.address }}{% if apt.rooms %} · {{ apt.rooms }} комн.{% endif %}{% if apt.area %} · {{ apt.area }} м²{% endif %}{% if apt.floor %} · {{ apt.floor }} эт.{% endif %}</div>
-        <div class="apt-price" data-price="{{ apt.price }}"></div>
       </div>
       <div class="apt-actions">
         <label class="toggle" title="Показывать на сайте">
@@ -252,12 +279,11 @@ input:checked + .slider::before { transform: translateX(20px); }
     <h3>Редактировать объект</h3>
     <input type="hidden" id="eId">
     <div class="fgrid">
-      <div class="fg"><label class="fl">Название / ЖК</label><input class="fi" id="eTitle"></div>
-      <div class="fg"><label class="fl">Цена</label><input class="fi" id="ePrice"></div>
+      <div class="fg full"><label class="fl">Заголовок</label><input class="fi" id="eTitle"></div>
       <div class="fg"><label class="fl">Комнат</label><input class="fi" id="eRooms"></div>
       <div class="fg"><label class="fl">Площадь, м²</label><input class="fi" id="eArea"></div>
       <div class="fg"><label class="fl">Этаж</label><input class="fi" id="eFloor"></div>
-      <div class="fg"><label class="fl">Метро</label><input class="fi" id="eMetroName"></div>
+      <div class="fg"><label class="fl">Метро</label><input class="fi" id="eMetroName" list="metroSuggestions" oninput="autoMetroColor('eMetroColor', this.value)" onchange="autoMetroColor('eMetroColor', this.value)"></div>
       <div class="fg"><label class="fl">Цвет ветки</label>
         <select class="fi" id="eMetroColor">
           <option value="">— не указывать —</option>
@@ -265,26 +291,43 @@ input:checked + .slider::before { transform: translateX(20px); }
           <option value="#4baf4f">Замоскворецкая (зелёная)</option>
           <option value="#0078bf">Арбатско-Покровская (синяя)</option>
           <option value="#009bde">Филёвская (голубая)</option>
-          <option value="#884898">Кольцевая (фиолетовая)</option>
+          <option value="#7a4b3a">Кольцевая (коричневая)</option>
           <option value="#f07e24">Калужско-Рижская (оранжевая)</option>
-          <option value="#8d6ca8">Таганско-Краснопресненская (сиреневая)</option>
+          <option value="#8d6ca8">Таганско-Краснопресненская (фиолетовая)</option>
           <option value="#ffe400">Калининская (жёлтая)</option>
-          <option value="#a2b72b">Серпуховско-Тимирязевская (салатовая)</option>
-          <option value="#b5985a">Люблинско-Дмитровская (коричневая)</option>
+          <option value="#9e9e9e">Серпуховско-Тимирязевская (серая)</option>
+          <option value="#bdbe00">Люблинско-Дмитровская (жёлто-зелёная)</option>
           <option value="#78c7c7">Большая Кольцевая (бирюзовая)</option>
+          <option value="#cf4785">Некрасовская (малиновая)</option>
+          <option value="#f0811e">МЦК (оранжево-красная)</option>
           <option value="#e696be">МЦД (розовая)</option>
         </select>
       </div>
       <div class="fg"><label class="fl">Пешком (мин)</label><input class="fi" id="eMetroWalk"></div>
       <div class="fg full"><label class="fl">Описание</label><textarea class="ft" id="eDesc"></textarea></div>
       <div class="fg full">
-        <label class="fl">Добавить фото</label>
+        <label class="fl">Фото для сайта <span style="color:var(--gold)">(без надписей)</span></label>
         <div class="upload-zone">
           <input type="file" id="eFileInput" multiple accept="image/*" onchange="handleEditFiles(this.files)">
           <div class="upload-zone-text"><strong>Нажмите для выбора</strong> или перетащите фото</div>
         </div>
         <div class="photos-preview" id="ePreview"></div>
       </div>
+      <div class="fg full">
+        <span class="covered-label">Covered для соцсетей (Instagram / TikTok)</span>
+        <div class="covered-zone" id="eCoveredZone">
+          <input type="file" id="eCoveredInput" accept="image/*" onchange="handleCoveredFile(this.files[0], 'e')">
+          <div class="upload-zone-text" style="font-size:12px">
+            <strong style="color:#e07040">Загрузить covered</strong> — не публикуется на сайте
+          </div>
+        </div>
+        <div id="eCoveredPreview"></div>
+      </div>
+    </div>
+    <div style="margin-top:16px; padding:14px; background:#fffaf6; border:1px solid #f0a070; border-radius:2px;">
+      <div style="font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:#e07040; margin-bottom:8px;">Gemini — текст для covered</div>
+      <button class="btn" style="background:#e07040;color:#fff;font-size:11px;padding:8px 16px;" onclick="generateCoveredText()">✦ Сгенерировать текст</button>
+      <pre id="coveredTextResult" style="display:none; margin-top:12px; font-family:'Outfit',sans-serif; font-size:13px; line-height:1.6; white-space:pre-wrap; color:var(--ink); background:var(--white); border:1px solid var(--border); padding:12px; border-radius:1px;"></pre>
     </div>
     <div class="edit-actions">
       <button class="btn btn-edit" onclick="closeEdit()">Отмена</button>
@@ -294,6 +337,117 @@ input:checked + .slider::before { transform: translateX(20px); }
 </div>
 
 <script>
+// ── Карта станций метро → цвет ветки ───────
+const METRO_MAP = {
+  // Сокольническая (красная)
+  'Бульвар Рокоссовского':'#ef3124','Черкизовская':'#ef3124','Преображенская площадь':'#ef3124',
+  'Сокольники':'#ef3124','Красносельская':'#ef3124','Красные ворота':'#ef3124',
+  'Чистые пруды':'#ef3124','Лубянка':'#ef3124','Охотный ряд':'#ef3124',
+  'Библиотека им. Ленина':'#ef3124','Кропоткинская':'#ef3124','Парк культуры':'#ef3124',
+  'Фрунзенская':'#ef3124','Спортивная':'#ef3124','Воробьёвы горы':'#ef3124',
+  'Университет':'#ef3124','Проспект Вернадского':'#ef3124','Юго-Западная':'#ef3124',
+  'Тропарёво':'#ef3124','Румянцево':'#ef3124','Саларьево':'#ef3124',
+  'Филатов Луг':'#ef3124','Прокшино':'#ef3124','Ольховая':'#ef3124','Коммунарка':'#ef3124',
+  // Замоскворецкая (зелёная)
+  'Речной вокзал':'#4baf4f','Водный стадион':'#4baf4f','Войковская':'#4baf4f',
+  'Сокол':'#4baf4f','Аэропорт':'#4baf4f','Динамо':'#4baf4f','Маяковская':'#4baf4f',
+  'Тверская':'#4baf4f','Театральная':'#4baf4f','Новокузнецкая':'#4baf4f',
+  'Автозаводская':'#4baf4f','Технопарк':'#4baf4f','Коломенская':'#4baf4f',
+  'Каширская':'#4baf4f','Кантемировская':'#4baf4f','Царицыно':'#4baf4f',
+  'Орехово':'#4baf4f','Домодедовская':'#4baf4f','Красногвардейская':'#4baf4f',
+  'Алма-Атинская':'#4baf4f','Зябликово':'#4baf4f',
+  // Арбатско-Покровская (синяя)
+  'Щёлковская':'#0078bf','Первомайская':'#0078bf','Измайловская':'#0078bf',
+  'Партизанская':'#0078bf','Семёновская':'#0078bf','Электрозаводская':'#0078bf',
+  'Бауманская':'#0078bf','Курская':'#0078bf','Площадь Революции':'#0078bf',
+  'Арбатская':'#0078bf','Смоленская':'#0078bf','Киевская':'#0078bf',
+  'Парк Победы':'#0078bf','Минская':'#0078bf','Ломоносовский проспект':'#0078bf',
+  'Раменки':'#0078bf','Мичуринский проспект':'#0078bf','Озёрная':'#0078bf',
+  'Говорово':'#0078bf','Солнцево':'#0078bf','Боровское шоссе':'#0078bf',
+  'Новопеределкино':'#0078bf','Рассказовка':'#0078bf',
+  // Филёвская (голубая)
+  'Александровский сад':'#009bde','Выставочная':'#009bde','Международная':'#009bde',
+  'Студенческая':'#009bde','Кутузовская':'#009bde','Фили':'#009bde',
+  'Багратионовская':'#009bde','Филёвский парк':'#009bde','Пионерская':'#009bde',
+  'Кунцевская':'#009bde','Деловой центр':'#009bde',
+  // Кольцевая (коричневая) — только уникальные
+  'Добрынинская':'#7a4b3a','Новослободская':'#7a4b3a','Краснопресненская':'#7a4b3a',
+  // Калужско-Рижская (оранжевая)
+  'Медведково':'#f07e24','Бабушкинская':'#f07e24','Свиблово':'#f07e24',
+  'Ботанический сад':'#f07e24','ВДНХ':'#f07e24','Алексеевская':'#f07e24',
+  'Рижская':'#f07e24','Проспект Мира':'#f07e24','Сухаревская':'#f07e24',
+  'Тургеневская':'#f07e24','Китай-город':'#f07e24','Третьяковская':'#f07e24',
+  'Октябрьская':'#f07e24','Ленинский проспект':'#f07e24','Шаболовская':'#f07e24',
+  'Академическая':'#f07e24','Профсоюзная':'#f07e24','Новые Черёмушки':'#f07e24',
+  'Калужская':'#f07e24','Беляево':'#f07e24','Коньково':'#f07e24',
+  'Тёплый Стан':'#f07e24','Ясенево':'#f07e24','Новоясеневская':'#f07e24',
+  // Таганско-Краснопресненская (фиолетовая)
+  'Планерная':'#8d6ca8','Сходненская':'#8d6ca8','Тушинская':'#8d6ca8',
+  'Спартак':'#8d6ca8','Щукинская':'#8d6ca8','Октябрьское поле':'#8d6ca8',
+  'Полежаевская':'#8d6ca8','Беговая':'#8d6ca8','Улица 1905 года':'#8d6ca8',
+  'Баррикадная':'#8d6ca8','Пушкинская':'#8d6ca8','Чеховская':'#8d6ca8',
+  'Боровицкая':'#8d6ca8','Таганская':'#8d6ca8','Пролетарская':'#8d6ca8',
+  'Волгоградский проспект':'#8d6ca8','Текстильщики':'#8d6ca8','Кузьминки':'#8d6ca8',
+  'Рязанский проспект':'#8d6ca8','Выхино':'#8d6ca8','Лермонтовский проспект':'#8d6ca8',
+  'Жулебино':'#8d6ca8','Котельники':'#8d6ca8',
+  // Калининская (жёлтая)
+  'Новокосино':'#ffe400','Новогиреево':'#ffe400','Перово':'#ffe400',
+  'Шоссе Энтузиастов':'#ffe400','Авиамоторная':'#ffe400','Площадь Ильича':'#ffe400',
+  'Марксистская':'#ffe400','Кузнецкий Мост':'#ffe400',
+  // Серпуховско-Тимирязевская (серая)
+  'Алтуфьево':'#9e9e9e','Бибирево':'#9e9e9e','Отрадное':'#9e9e9e',
+  'Владыкино':'#9e9e9e','Петровско-Разумовская':'#9e9e9e','Тимирязевская':'#9e9e9e',
+  'Дмитровская':'#9e9e9e','Савёловская':'#9e9e9e','Менделеевская':'#9e9e9e',
+  'Цветной бульвар':'#9e9e9e','Серпуховская':'#9e9e9e','Тульская':'#9e9e9e',
+  'Нагатинская':'#9e9e9e','Нагорная':'#9e9e9e','Нахимовский проспект':'#9e9e9e',
+  'Севастопольская':'#9e9e9e','Чертановская':'#9e9e9e','Южная':'#9e9e9e',
+  'Пражская':'#9e9e9e','Улица Академика Янгеля':'#9e9e9e','Аннино':'#9e9e9e',
+  'Бульвар Дмитрия Донского':'#9e9e9e','Лесопарковая':'#9e9e9e','Битцевский парк':'#9e9e9e',
+  // Люблинско-Дмитровская (жёлто-зелёная)
+  'Селигерская':'#bdbe00','Верхние Лихоборы':'#bdbe00','Окружная':'#bdbe00',
+  'Фонвизинская':'#bdbe00','Бутырская':'#bdbe00','Марьина роща':'#bdbe00',
+  'Достоевская':'#bdbe00','Трубная':'#bdbe00','Сретенский бульвар':'#bdbe00',
+  'Чкаловская':'#bdbe00','Римская':'#bdbe00','Крестьянская застава':'#bdbe00',
+  'Дубровка':'#bdbe00','Кожуховская':'#bdbe00','Печатники':'#bdbe00',
+  'Волжская':'#bdbe00','Люблино':'#bdbe00','Братиславская':'#bdbe00',
+  'Марьино':'#bdbe00','Борисово':'#bdbe00','Шипиловская':'#bdbe00',
+  // Большая Кольцевая (бирюзовая)
+  'Мневники':'#78c7c7','Терехово':'#78c7c7','Давыдково':'#78c7c7',
+  'Аминьевская':'#78c7c7','Мичуринский проспект (БКЛ)':'#78c7c7','Проспект Вернадского (БКЛ)':'#78c7c7',
+  'Новаторская':'#78c7c7','Воронцовская':'#78c7c7','Зюзино':'#78c7c7',
+  'Каховская':'#78c7c7','Варшавская':'#78c7c7','Каширская (БКЛ)':'#78c7c7',
+  'Нагатинский Затон':'#78c7c7','Кленовый бульвар':'#78c7c7','Нижегородская':'#78c7c7',
+  'Стахановская':'#78c7c7','Окская':'#78c7c7','Юго-Восточная':'#78c7c7',
+  'Лухмановская':'#78c7c7','Некрасовка':'#78c7c7',
+  // Некрасовская (малиновая)
+  'Лефортово':'#cf4785','Косино':'#cf4785','Улица Дмитриевского':'#cf4785',
+  // МЦК (оранжево-красная)
+  'Лужники':'#f0811e','Площадь Гагарина':'#f0811e','Крымская':'#f0811e',
+  'Верхние Котлы':'#f0811e','ЗИЛ':'#f0811e','Угрешская':'#f0811e',
+  'Дубровка (МЦК)':'#f0811e','Автозаводская (МЦК)':'#f0811e',
+  'Ботанический сад (МЦК)':'#f0811e','Ростокино':'#f0811e',
+  'Белокаменная':'#f0811e','Бульвар Рокоссовского (МЦК)':'#f0811e',
+  'Локомотив':'#f0811e','Измайлово':'#f0811e','Соколиная гора':'#f0811e',
+  'Шоссе Энтузиастов (МЦК)':'#f0811e','Андроновка':'#f0811e','Нижегородская (МЦК)':'#f0811e',
+  'Новохохловская':'#f0811e','Рязанская':'#f0811e','Велозаводская':'#f0811e',
+  // МЦД (розовая) — разные диаметры, общий fallback
+  'Одинцово':'#e696be','Кунцево':'#e696be','Фили (МЦД)':'#e696be',
+  'Беговая (МЦД)':'#e696be','Тестовская':'#e696be','Пресня':'#e696be',
+  'Хорошёво':'#e696be','Зорге':'#e696be','Щукинская (МЦД)':'#e696be',
+  // Общие станции (межпересадочные) — Комсомольская, Белорусская, Павелецкая
+  'Комсомольская':'#7a4b3a','Белорусская':'#4baf4f','Павелецкая':'#4baf4f',
+};
+
+function autoMetroColor(selectId, stationName) {
+  const val = stationName.trim();
+  const color = METRO_MAP[val];
+  if (color) {
+    const sel = document.getElementById(selectId);
+    sel.value = color;
+    updateMetroSelectColor(sel);
+  }
+}
+
 const APTS = {{ apartments|tojson }};
 const APT_MAP = {};
 APTS.forEach(a => APT_MAP[a.id] = a);
@@ -311,15 +465,6 @@ function updateMetroSelectColor(sel) {
 });
 
 // ── Форматирование цен ──────────────────────
-function formatPrice(raw) {
-  if (!raw) return '';
-  const digits = String(raw).replace(/\D/g, '');
-  if (!digits) return raw;
-  return parseInt(digits).toLocaleString('ru-RU') + ' ₽';
-}
-document.querySelectorAll('.apt-price[data-price]').forEach(el => {
-  el.textContent = formatPrice(el.dataset.price);
-});
 
 // ── Toast ───────────────────────────────────
 function toast(msg, ms=2500) {
@@ -330,6 +475,8 @@ function toast(msg, ms=2500) {
 
 // ── Загрузка фото (форма добавления) ───────
 let addedImages = [];
+let addedCovered = '';   // URL covered для формы добавления
+let editCoveredImage = ''; // URL covered для формы редактирования
 
 async function handleFiles(files) {
   for (const file of files) {
@@ -359,6 +506,29 @@ function removeImg(i) {
   addedImages.splice(i, 1); renderPreview();
 }
 
+// ── Загрузка covered ────────────────────────
+async function handleCoveredFile(file, prefix) {
+  if (!file) return;
+  const url = await uploadFile(file);
+  if (!url) return;
+  if (prefix === 'f') { addedCovered = url; renderCoveredPreview('fCoveredPreview', url, () => { addedCovered = ''; renderCoveredPreview('fCoveredPreview', ''); }); }
+  if (prefix === 'e') { editCoveredImage = url; renderCoveredPreview('eCoveredPreview', url, () => { editCoveredImage = ''; renderCoveredPreview('eCoveredPreview', ''); }); }
+}
+
+function renderCoveredPreview(containerId, url, onRemove) {
+  const p = document.getElementById(containerId);
+  if (!url) { p.innerHTML = ''; return; }
+  p.innerHTML = `
+    <div style="display:inline-block; margin-top:8px; text-align:center;">
+      <div class="covered-preview">
+        <img src="${url}" alt="covered">
+        <button class="covered-remove" onclick="(${onRemove.toString()})()">×</button>
+      </div>
+      <br>
+      <a class="covered-download" href="${url}" download>↓ Скачать</a>
+    </div>`;
+}
+
 // ── Drag & drop ─────────────────────────────
 const dz = document.getElementById('dropZone');
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
@@ -373,8 +543,7 @@ async function addApt() {
   const title = document.getElementById('fTitle').value.trim();
   if (!title) { alert('Введите название'); return; }
   const data = {
-    title, images: addedImages,
-    price: document.getElementById('fPrice').value.trim(),
+    title, images: addedImages, covered_image: addedCovered,
     rooms: document.getElementById('fRooms').value.trim(),
     area: document.getElementById('fArea').value.trim(),
     floor: document.getElementById('fFloor').value.trim(),
@@ -414,6 +583,7 @@ function openEdit(id) {
   if (!apt) return;
   editId = apt.id;
   editImages = apt.images ? [...apt.images] : [];
+  editCoveredImage = apt.covered_image || '';
   document.getElementById('eTitle').value = apt.title || '';
   document.getElementById('ePrice').value = apt.price || '';
   document.getElementById('eRooms').value = apt.rooms || '';
@@ -424,6 +594,11 @@ function openEdit(id) {
   document.getElementById('eMetroColor').value = apt.metro_color || '';
   document.getElementById('eMetroWalk').value = apt.metro_walk || '';
   renderEditPreview();
+  if (editCoveredImage) {
+    renderCoveredPreview('eCoveredPreview', editCoveredImage, () => { editCoveredImage = ''; renderCoveredPreview('eCoveredPreview', ''); });
+  } else {
+    renderCoveredPreview('eCoveredPreview', '');
+  }
   document.getElementById('editOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -455,10 +630,35 @@ function renderEditPreview() {
 
 function removeEditImg(i) { editImages.splice(i, 1); renderEditPreview(); }
 
+// ── Генерация текста через Gemini ───────────
+async function generateCoveredText() {
+  if (!editId) return;
+  const btn = event.target;
+  const pre = document.getElementById('coveredTextResult');
+  btn.textContent = '...генерируем';
+  btn.disabled = true;
+  pre.style.display = 'none';
+  try {
+    const r = await fetch(`/admin/generate-covered/${editId}`, { method: 'POST' });
+    const d = await r.json();
+    if (d.success) {
+      pre.textContent = d.text;
+      pre.style.display = 'block';
+    } else {
+      pre.textContent = 'Ошибка: ' + (d.error || 'неизвестная');
+      pre.style.display = 'block';
+    }
+  } catch(e) {
+    pre.textContent = 'Ошибка соединения';
+    pre.style.display = 'block';
+  }
+  btn.textContent = '✦ Сгенерировать текст';
+  btn.disabled = false;
+}
+
 async function saveEdit() {
   const data = {
     title: document.getElementById('eTitle').value.trim(),
-    price: document.getElementById('ePrice').value.trim(),
     rooms: document.getElementById('eRooms').value.trim(),
     area: document.getElementById('eArea').value.trim(),
     floor: document.getElementById('eFloor').value.trim(),
@@ -466,7 +666,8 @@ async function saveEdit() {
     metro_name: document.getElementById('eMetroName').value.trim(),
     metro_color: document.getElementById('eMetroColor').value,
     metro_walk: document.getElementById('eMetroWalk').value.trim(),
-    images: editImages
+    images: editImages,
+    covered_image: editCoveredImage
   };
   const r = await fetch(`/admin/update/${editId}`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
@@ -476,5 +677,85 @@ async function saveEdit() {
   if (d.success) { toast('Сохранено!'); setTimeout(() => location.reload(), 700); closeEdit(); }
 }
 </script>
+
+<datalist id="metroSuggestions">
+  <option>Алтуфьево</option><option>Аминьевская</option><option>Аннино</option>
+  <option>Арбатская</option><option>Академическая</option><option>Алексеевская</option>
+  <option>Алма-Атинская</option><option>Александровский сад</option>
+  <option>Автозаводская</option><option>Авиамоторная</option><option>Аэропорт</option>
+  <option>Багратионовская</option><option>Бабушкинская</option><option>Баррикадная</option>
+  <option>Бауманская</option><option>Беговая</option><option>Беляево</option>
+  <option>Белорусская</option><option>Бибирево</option><option>Библиотека им. Ленина</option>
+  <option>Битцевский парк</option><option>Борисово</option><option>Ботанический сад</option>
+  <option>Боровицкая</option><option>Боровское шоссе</option><option>Братиславская</option>
+  <option>Бульвар Дмитрия Донского</option><option>Бульвар Рокоссовского</option>
+  <option>Бутырская</option><option>Бауманская</option>
+  <option>Варшавская</option><option>ВДНХ</option><option>Верхние Котлы</option>
+  <option>Верхние Лихоборы</option><option>Владыкино</option><option>Волгоградский проспект</option>
+  <option>Волжская</option><option>Водный стадион</option><option>Войковская</option>
+  <option>Воробьёвы горы</option><option>Воронцовская</option><option>Выставочная</option>
+  <option>Выхино</option>
+  <option>Говорово</option><option>Деловой центр</option><option>Динамо</option>
+  <option>Дмитровская</option><option>Добрынинская</option><option>Домодедовская</option>
+  <option>Достоевская</option><option>Дубровка</option><option>Жулебино</option>
+  <option>Зябликово</option><option>Зюзино</option><option>Измайловская</option>
+  <option>Каховская</option><option>Калужская</option><option>Кантемировская</option>
+  <option>Каширская</option><option>Китай-город</option><option>Кленовый бульвар</option>
+  <option>Коломенская</option><option>Коммунарка</option><option>Комсомольская</option>
+  <option>Коньково</option><option>Косино</option><option>Котельники</option>
+  <option>Кожуховская</option><option>Красногвардейская</option><option>Красносельская</option>
+  <option>Красные ворота</option><option>Краснопресненская</option>
+  <option>Крестьянская застава</option><option>Кропоткинская</option>
+  <option>Кузнецкий Мост</option><option>Кузьминки</option><option>Кунцевская</option>
+  <option>Курская</option><option>Кутузовская</option>
+  <option>Лефортово</option><option>Ленинский проспект</option>
+  <option>Лермонтовский проспект</option><option>Лесопарковая</option>
+  <option>Ломоносовский проспект</option><option>Лубянка</option><option>Люблино</option>
+  <option>Лухмановская</option>
+  <option>Маяковская</option><option>Марксистская</option><option>Марьина роща</option>
+  <option>Марьино</option><option>Медведково</option><option>Менделеевская</option>
+  <option>Международная</option><option>Мичуринский проспект</option><option>Минская</option>
+  <option>Мневники</option>
+  <option>Нагатинская</option><option>Нагатинский Затон</option><option>Нагорная</option>
+  <option>Нахимовский проспект</option><option>Некрасовка</option>
+  <option>Нижегородская</option><option>Новогиреево</option><option>Новокосино</option>
+  <option>Новокузнецкая</option><option>Новопеределкино</option>
+  <option>Новослободская</option><option>Новые Черёмушки</option><option>Новоясеневская</option>
+  <option>Новаторская</option>
+  <option>Октябрьская</option><option>Октябрьское поле</option><option>Ольховая</option>
+  <option>Орехово</option><option>Отрадное</option><option>Охотный ряд</option>
+  <option>Окская</option><option>Окружная</option><option>Озёрная</option>
+  <option>Парк Победы</option><option>Парк культуры</option><option>Партизанская</option>
+  <option>Павелецкая</option><option>Перово</option><option>Первомайская</option>
+  <option>Петровско-Разумовская</option><option>Печатники</option><option>Пионерская</option>
+  <option>Площадь Гагарина</option><option>Площадь Ильича</option>
+  <option>Площадь Революции</option><option>Планерная</option><option>Полежаевская</option>
+  <option>Пражская</option><option>Преображенская площадь</option><option>Прокшино</option>
+  <option>Пролетарская</option><option>Проспект Вернадского</option>
+  <option>Проспект Мира</option><option>Профсоюзная</option><option>Пушкинская</option>
+  <option>Раменки</option><option>Рассказовка</option><option>Речной вокзал</option>
+  <option>Римская</option><option>Рижская</option><option>Ростокино</option>
+  <option>Румянцево</option><option>Рязанский проспект</option>
+  <option>Саларьево</option><option>Савёловская</option><option>Свиблово</option>
+  <option>Семёновская</option><option>Серпуховская</option><option>Севастопольская</option>
+  <option>Сокол</option><option>Сокольники</option><option>Солнцево</option>
+  <option>Спартак</option><option>Спортивная</option><option>Сретенский бульвар</option>
+  <option>Студенческая</option><option>Сухаревская</option><option>Сходненская</option>
+  <option>Таганская</option><option>Театральная</option><option>Технопарк</option>
+  <option>Текстильщики</option><option>Тимирязевская</option><option>Тёплый Стан</option>
+  <option>Третьяковская</option><option>Трубная</option><option>Тульская</option>
+  <option>Тургеневская</option><option>Тушинская</option>
+  <option>Улица 1905 года</option><option>Улица Академика Янгеля</option>
+  <option>Улица Дмитриевского</option>
+  <option>Университет</option><option>Фили</option><option>Филатов Луг</option>
+  <option>Филёвский парк</option><option>Фонвизинская</option><option>Фрунзенская</option>
+  <option>Хорошёвская</option><option>Царицыно</option><option>Цветной бульвар</option>
+  <option>Чертановская</option><option>Черкизовская</option><option>Чеховская</option>
+  <option>Чистые пруды</option><option>Чкаловская</option>
+  <option>Шаболовская</option><option>Шипиловская</option><option>Щёлковская</option>
+  <option>Щукинская</option><option>Шоссе Энтузиастов</option>
+  <option>Электрозаводская</option><option>Юго-Восточная</option><option>Юго-Западная</option>
+  <option>Южная</option><option>Ясенево</option>
+</datalist>
 </body>
 </html>

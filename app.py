@@ -5,6 +5,12 @@ import requests
 from datetime import datetime
 import uuid
 
+try:
+    from google import genai as google_genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'realty-secret-2024')
 
@@ -13,6 +19,7 @@ UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 AMO_DOMAIN = os.environ.get('AMO_DOMAIN', 'laresgroup.amocrm.ru')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 AMO_TOKEN = os.environ.get('AMO_TOKEN', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6IjQ2N2VjY2ViZTAzZmQzY2RiMDBjNmQxMTY4MGNhNmVkNWQ4NjI2MTBjNDgxZmFhM2QyZjdiYzMzYzlhNTRmYjgyZGUyMzQ1NzJlMzA5YTQxIn0.eyJhdWQiOiI0ZjBhMjNhYy01NzI0LTQ0Y2ItOGQ0ZC0xNmQ4ZmQxNjc3MzkiLCJqdGkiOiI0NjdlY2NlYmUwM2ZkM2NkYjAwYzZkMTE2ODBjYTZlZDVkODYyNjEwYzQ4MWZhYTNkMmY3YmMzM2M5YTU0ZmI4MmRlMjM0NTcyZTMwOWE0MSIsImlhdCI6MTc3NTgyNDkxNCwibmJmIjoxNzc1ODI0OTE0LCJleHAiOjE3NzgzNzEyMDAsInN1YiI6IjkwOTgyMzAiLCJncmFudF90eXBlIjoiIiwiYWNjb3VudF9pZCI6MzA3Nzk2MzAsImJhc2VfZG9tYWluIjoiYW1vY3JtLnJ1IiwidmVyc2lvbiI6Miwic2NvcGVzIjpbInB1c2hfbm90aWZpY2F0aW9ucyIsImZpbGVzIiwiY3JtIiwiZmlsZXNfZGVsZXRlIiwibm90aWZpY2F0aW9ucyJdLCJoYXNoX3V1aWQiOiJjZTM4Yjc1Ny0yODBjLTRkMDItYjIzOC0xZmY4ZWE4NTBhY2YiLCJhcGlfZG9tYWluIjoiYXBpLWIuYW1vY3JtLnJ1In0.Vd8R5c5usJ2sOoEqmS8qQgyJfNs3B2gFQ3o4IWym5gmUCKXiEqEDvodBEwlj4-y1xMlaVB4vuz3Bkaj2Gpsf-WKQy9OTbzRVU8lir9gKfj_eJ52ZIokpySiL0pKEy6bFeJXOjkhg2We6ZIy3voYCSvuTzDqD2pyKmhFX06O1PkJepvfUX4la2NN0385Ebh9T686gv54t1QIsRhgaOvKg1UXaiDCQMMLi70AdoPP4p_56HNZbbCiUWUG0fMyB87dyCX3NCurzlRUFGwP_sFncZDQxko3ueNUXpeI2t4-o6qaSDkPErqtZ3yEz4AUX9Vkg2_9ht2n6O5uSGsF6aNrIGQ')
 AMO_PIPELINE_ID = 6314686   # ОТДЕЛ ПРОДАЖ
 AMO_STATUS_ID = 54235682    # 1. Новая заявка
@@ -265,6 +272,7 @@ def admin_add():
         'floor': data.get('floor', ''),
         'description': data.get('description', ''),
         'images': data.get('images', []),
+        'covered_image': data.get('covered_image', ''),
         'active': True,
         'created_at': datetime.now().isoformat()
     }
@@ -291,6 +299,62 @@ def admin_delete(apt_id):
     apartments = [a for a in load_apartments() if a['id'] != apt_id]
     save_apartments(apartments)
     return jsonify({'success': True})
+
+@app.route('/admin/generate-covered/<apt_id>', methods=['POST'])
+def generate_covered_text(apt_id):
+    if not session.get('admin'):
+        return jsonify({'success': False}), 403
+    if not GEMINI_AVAILABLE:
+        return jsonify({'success': False, 'error': 'google-genai не установлен'})
+    if not GEMINI_API_KEY:
+        return jsonify({'success': False, 'error': 'GEMINI_API_KEY не задан'})
+
+    apt = next((a for a in load_apartments() if a['id'] == apt_id), None)
+    if not apt:
+        return jsonify({'success': False, 'error': 'Квартира не найдена'})
+
+    metro = apt.get('metro_name', '')
+    rooms = apt.get('rooms', '')
+    area = apt.get('area', '')
+    floor = apt.get('floor', '')
+    desc = apt.get('description', '')
+
+    prompt = f"""Ты маркетолог элитной недвижимости в Москве.
+Создай текст для обложки поста в Instagram/TikTok о продаже квартиры.
+
+Данные квартиры:
+- Метро: {metro}
+- Комнат: {rooms}
+- Площадь: {area} м²
+- Этаж: {floor}
+- Описание: {desc}
+
+Формат ответа — строго два блока:
+
+ЗАГОЛОВОК: (одна строка — название станции метро, коротко и цепко, например «м. Сокольники»)
+
+ОПИСАНИЕ:
+• (маркер 1 — самое сильное преимущество, 5-8 слов)
+• (маркер 2 — площадь/планировка/этаж, 5-8 слов)
+• (маркер 3 — локация/инфраструктура/вид, 5-8 слов)
+
+Требования:
+- Только про продажу, никакой аренды
+- Текст маркетинговый, живой, без канцелярита
+- Каждый маркер — законченная мысль
+- Не более 3 маркеров
+- Если есть вид на Москва-Сити, Кремль — обязательно упомяни"""
+
+    try:
+        client = google_genai.Client(api_key=GEMINI_API_KEY)
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt
+        )
+        text = response.text.strip()
+        return jsonify({'success': True, 'text': text})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/admin/leads')
 def admin_leads():
