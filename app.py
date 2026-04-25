@@ -35,6 +35,11 @@ DATABASE_URL = os.environ.get('DATABASE_URL', '')
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
+USE_DB = bool(DATABASE_URL) and PSYCOPG2_AVAILABLE
+
+DATA_FILE = 'data/apartments.json'
+VIEWS_FILE = 'data/views.json'
+
 os.makedirs('data', exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -116,57 +121,91 @@ def migrate_from_json():
     print(f'Migrated {len(apts)} apartments from JSON')
 
 def load_apartments():
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cur.execute('SELECT * FROM apartments ORDER BY created_at DESC')
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    return [apt_from_row(r) for r in rows]
+    if USE_DB:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT * FROM apartments ORDER BY created_at DESC')
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return [apt_from_row(r) for r in rows]
+    if not os.path.exists(DATA_FILE):
+        return []
+    with open(DATA_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def save_apartments_json(apartments):
+    with open(DATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(apartments, f, ensure_ascii=False, indent=2)
 
 def get_apartment(apt_id):
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cur.execute('SELECT * FROM apartments WHERE id = %s', (apt_id,))
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-    return apt_from_row(row) if row else None
+    if USE_DB:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT * FROM apartments WHERE id = %s', (apt_id,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        return apt_from_row(row) if row else None
+    return next((a for a in load_apartments() if a['id'] == apt_id), None)
+
+def _json_views():
+    if not os.path.exists(VIEWS_FILE):
+        return {}
+    with open(VIEWS_FILE, 'r') as f:
+        return json.load(f)
+
+def _save_json_views(views):
+    with open(VIEWS_FILE, 'w') as f:
+        json.dump(views, f)
 
 def get_views(apt_id):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute('SELECT count FROM apt_views WHERE apt_id = %s', (apt_id,))
-    row = cur.fetchone()
-    if row is None:
-        count = random.randint(50, 200)
-        cur.execute('INSERT INTO apt_views (apt_id, count) VALUES (%s, %s) ON CONFLICT DO NOTHING', (apt_id, count))
-        conn.commit()
-    else:
-        count = row[0]
-    cur.close()
-    conn.close()
-    return count
+    if USE_DB:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('SELECT count FROM apt_views WHERE apt_id = %s', (apt_id,))
+        row = cur.fetchone()
+        if row is None:
+            count = random.randint(50, 200)
+            cur.execute('INSERT INTO apt_views (apt_id, count) VALUES (%s, %s) ON CONFLICT DO NOTHING', (apt_id, count))
+            conn.commit()
+        else:
+            count = row[0]
+        cur.close()
+        conn.close()
+        return count
+    views = _json_views()
+    if apt_id not in views:
+        views[apt_id] = random.randint(50, 200)
+        _save_json_views(views)
+    return views[apt_id]
 
 def get_all_views(apt_ids):
     if not apt_ids:
         return {}
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute('SELECT apt_id, count FROM apt_views WHERE apt_id = ANY(%s)', (apt_ids,))
-    existing = {r[0]: r[1] for r in cur.fetchall()}
-    result = {}
+    if USE_DB:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('SELECT apt_id, count FROM apt_views WHERE apt_id = ANY(%s)', (apt_ids,))
+        existing = {r[0]: r[1] for r in cur.fetchall()}
+        result = {}
+        for apt_id in apt_ids:
+            if apt_id not in existing:
+                count = random.randint(50, 200)
+                cur.execute('INSERT INTO apt_views (apt_id, count) VALUES (%s, %s) ON CONFLICT DO NOTHING', (apt_id, count))
+                result[apt_id] = count
+            else:
+                result[apt_id] = existing[apt_id]
+        conn.commit()
+        cur.close()
+        conn.close()
+        return result
+    views = _json_views()
     for apt_id in apt_ids:
-        if apt_id not in existing:
-            count = random.randint(50, 200)
-            cur.execute('INSERT INTO apt_views (apt_id, count) VALUES (%s, %s) ON CONFLICT DO NOTHING', (apt_id, count))
-            result[apt_id] = count
-        else:
-            result[apt_id] = existing[apt_id]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return result
+        if apt_id not in views:
+            views[apt_id] = random.randint(50, 200)
+    _save_json_views(views)
+    return {apt_id: views[apt_id] for apt_id in apt_ids}
 
 # Инициализация БД при старте
 if DATABASE_URL and PSYCOPG2_AVAILABLE:
@@ -273,18 +312,23 @@ def submit_quiz():
 
 @app.route('/view/<apt_id>', methods=['POST'])
 def track_view(apt_id):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute('''
-        INSERT INTO apt_views (apt_id, count) VALUES (%s, 1)
-        ON CONFLICT (apt_id) DO UPDATE SET count = apt_views.count + 1
-        RETURNING count
-    ''', (apt_id,))
-    count = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'views': count})
+    if USE_DB:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO apt_views (apt_id, count) VALUES (%s, 1)
+            ON CONFLICT (apt_id) DO UPDATE SET count = apt_views.count + 1
+            RETURNING count
+        ''', (apt_id,))
+        count = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({'views': count})
+    views = _json_views()
+    views[apt_id] = views.get(apt_id, 0) + 1
+    _save_json_views(views)
+    return jsonify({'views': views[apt_id]})
 
 @app.route('/')
 def index():
@@ -360,23 +404,38 @@ def admin_add():
         return jsonify({'success': False}), 403
     data = request.json
     apt_id = str(uuid.uuid4())[:8]
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute('''
-        INSERT INTO apartments (id, title, address, price, rooms, area, floor, description,
-            images, covered_image, active, created_at, metro_name, metro_color, metro_walk)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,NOW(),%s,%s,%s)
-    ''', (
-        apt_id,
-        data.get('title', ''), data.get('address', ''), data.get('price', ''),
-        data.get('rooms', ''), data.get('area', ''), data.get('floor', ''),
-        data.get('description', ''), json.dumps(data.get('images', [])),
-        data.get('covered_image', ''),
-        data.get('metro_name', ''), data.get('metro_color', ''), data.get('metro_walk', ''),
-    ))
-    conn.commit()
-    cur.close()
-    conn.close()
+    if USE_DB:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO apartments (id, title, address, price, rooms, area, floor, description,
+                images, covered_image, active, created_at, metro_name, metro_color, metro_walk)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,NOW(),%s,%s,%s)
+        ''', (
+            apt_id,
+            data.get('title', ''), data.get('address', ''), data.get('price', ''),
+            data.get('rooms', ''), data.get('area', ''), data.get('floor', ''),
+            data.get('description', ''), json.dumps(data.get('images', [])),
+            data.get('covered_image', ''),
+            data.get('metro_name', ''), data.get('metro_color', ''), data.get('metro_walk', ''),
+        ))
+        conn.commit()
+        cur.close()
+        conn.close()
+    else:
+        apt = {
+            'id': apt_id, 'title': data.get('title', ''), 'address': data.get('address', ''),
+            'price': data.get('price', ''), 'rooms': data.get('rooms', ''),
+            'area': data.get('area', ''), 'floor': data.get('floor', ''),
+            'description': data.get('description', ''), 'images': data.get('images', []),
+            'covered_image': data.get('covered_image', ''), 'active': True,
+            'created_at': datetime.now().isoformat(),
+            'metro_name': data.get('metro_name', ''), 'metro_color': data.get('metro_color', ''),
+            'metro_walk': data.get('metro_walk', ''),
+        }
+        apts = load_apartments()
+        apts.append(apt)
+        save_apartments_json(apts)
     apt = get_apartment(apt_id)
     return jsonify({'success': True, 'apt': apt})
 
@@ -385,34 +444,45 @@ def admin_update(apt_id):
     if not session.get('admin'):
         return jsonify({'success': False}), 403
     data = request.json
-    allowed = ['title', 'address', 'price', 'rooms', 'area', 'floor',
-               'description', 'covered_image', 'active', 'metro_name', 'metro_color', 'metro_walk']
-    updates = {k: data[k] for k in allowed if k in data}
-    if 'images' in data:
-        updates['images'] = json.dumps(data['images'])
-    if not updates:
-        return jsonify({'success': True})
-    set_clause = ', '.join(f'{k} = %s' for k in updates.keys())
-    values = list(updates.values()) + [apt_id]
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(f'UPDATE apartments SET {set_clause} WHERE id = %s', values)
-    conn.commit()
-    cur.close()
-    conn.close()
+    if USE_DB:
+        allowed = ['title', 'address', 'price', 'rooms', 'area', 'floor',
+                   'description', 'covered_image', 'active', 'metro_name', 'metro_color', 'metro_walk']
+        updates = {k: data[k] for k in allowed if k in data}
+        if 'images' in data:
+            updates['images'] = json.dumps(data['images'])
+        if not updates:
+            return jsonify({'success': True})
+        set_clause = ', '.join(f'{k} = %s' for k in updates.keys())
+        values = list(updates.values()) + [apt_id]
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(f'UPDATE apartments SET {set_clause} WHERE id = %s', values)
+        conn.commit()
+        cur.close()
+        conn.close()
+    else:
+        apts = load_apartments()
+        for apt in apts:
+            if apt['id'] == apt_id:
+                apt.update({k: v for k, v in data.items() if k != 'id'})
+        save_apartments_json(apts)
     return jsonify({'success': True})
 
 @app.route('/admin/delete/<apt_id>', methods=['POST'])
 def admin_delete(apt_id):
     if not session.get('admin'):
         return jsonify({'success': False}), 403
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute('DELETE FROM apartments WHERE id = %s', (apt_id,))
-    cur.execute('DELETE FROM apt_views WHERE apt_id = %s', (apt_id,))
-    conn.commit()
-    cur.close()
-    conn.close()
+    if USE_DB:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('DELETE FROM apartments WHERE id = %s', (apt_id,))
+        cur.execute('DELETE FROM apt_views WHERE apt_id = %s', (apt_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+    else:
+        apts = [a for a in load_apartments() if a['id'] != apt_id]
+        save_apartments_json(apts)
     return jsonify({'success': True})
 
 @app.route('/admin/generate-covered/<apt_id>', methods=['POST'])
