@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, redirect, session, send_from_directory
+from flask import Flask, request, jsonify, render_template, redirect, session, send_from_directory, send_file
 import json
 import os
 import requests
@@ -629,6 +629,164 @@ def admin_leads():
     log_file = 'data/leads.json'
     leads = list(reversed(json.load(open(log_file)))) if os.path.exists(log_file) else []
     return render_template('leads.html', leads=leads)
+
+@app.route('/api/process-photo', methods=['POST'])
+def api_process_photo():
+    """
+    Убирает вотермарк Nano Banana (правый нижний угол 10%×10%).
+    Принимает: multipart/form-data с полем 'photo' (изображение)
+    Возвращает: JPEG без вотермарка
+    """
+    if not check_api_key():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if 'photo' not in request.files:
+        return jsonify({'success': False, 'error': 'No photo field'}), 400
+
+    try:
+        import cv2
+        import numpy as np
+        from PIL import Image
+        import io as _io
+
+        file = request.files['photo']
+        img_bytes = file.read()
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        h, w = img_bgr.shape[:2]
+        mw = int(w * 0.10)
+        mh = int(h * 0.10)
+        mask = np.zeros((h, w), dtype=np.uint8)
+        mask[h - mh:h, w - mw:w] = 255
+        result = cv2.inpaint(img_bgr, mask, 7, cv2.INPAINT_TELEA)
+
+        pil_img = Image.fromarray(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
+        buf = _io.BytesIO()
+        pil_img.save(buf, 'JPEG', quality=95)
+        buf.seek(0)
+        return send_file(buf, mimetype='image/jpeg', download_name='processed.jpg')
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/create-cover', methods=['POST'])
+def api_create_cover():
+    """
+    Накладывает заголовок и описание на фото для соцсетей.
+    Принимает: multipart/form-data
+        - photo: изображение
+        - title: заголовок (до 35 символов)
+        - description: описание (до 130 символов)
+    Возвращает: JPEG с текстом
+    """
+    if not check_api_key():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if 'photo' not in request.files:
+        return jsonify({'success': False, 'error': 'No photo field'}), 400
+
+    try:
+        from PIL import Image, ImageDraw, ImageFont, ImageFilter
+        import io as _io
+
+        TITLE_MAX  = 35
+        DESC_MAX   = 130
+        FONT_DIR   = os.path.join(os.path.dirname(__file__), 'static', 'fonts')
+        FONT_BOLD  = os.path.join(FONT_DIR, 'MontserratBold.ttf')
+        FONT_REG   = os.path.join(FONT_DIR, 'MontserratRegular.ttf')
+
+        title = (request.form.get('title', '') or '')[:TITLE_MAX]
+        desc  = (request.form.get('description', '') or '')
+
+        file_bytes = request.files['photo'].read()
+        img = Image.open(_io.BytesIO(file_bytes)).convert('RGBA')
+        w, h = img.size
+
+        # Градиент снизу
+        overlay = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+        draw_ov = ImageDraw.Draw(overlay)
+        grad_h  = int(h * 0.58)
+        for y in range(grad_h):
+            alpha = int(185 * (y / grad_h) ** 1.9)
+            draw_ov.rectangle([(0, h - grad_h + y), (w, h - grad_h + y + 1)],
+                               fill=(0, 0, 0, alpha))
+        img = Image.alpha_composite(img, overlay).convert('RGB')
+
+        if not os.path.exists(FONT_BOLD):
+            buf = _io.BytesIO()
+            img.save(buf, 'JPEG', quality=95)
+            buf.seek(0)
+            return send_file(buf, mimetype='image/jpeg', download_name='cover.jpg')
+
+        base       = min(w, h)
+        title_size = int(base * 0.041)
+        desc_size  = int(base * 0.031)
+        title_font = ImageFont.truetype(FONT_BOLD, title_size)
+        desc_font  = ImageFont.truetype(FONT_REG,  desc_size)
+
+        tx     = int(w * 0.06)
+        max_px = int(w * 0.88) - tx
+        dummy  = ImageDraw.Draw(Image.new('RGB', (1, 1)))
+
+        # Заголовок — обрезаем по словам, без компромиссов
+        words_t = title.split()
+        t, candidate = '', ''
+        for word in words_t:
+            test = (candidate + ' ' + word).strip()
+            if dummy.textbbox((0, 0), test, font=title_font)[2] <= max_px:
+                candidate = test
+            else:
+                break
+        t = candidate if candidate else title[:TITLE_MAX]
+
+        # Описание — перенос по пикселям, максимум 3 строки
+        if len(desc) > DESC_MAX:
+            desc = desc[:DESC_MAX].rsplit(' ', 1)[0] + '…'
+        words   = desc.split()
+        lines, current = [], ''
+        for word in words:
+            test = (current + ' ' + word).strip()
+            if dummy.textbbox((0, 0), test, font=desc_font)[2] <= max_px:
+                current = test
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        desc_lines = lines[:3]
+
+        ty           = int(h * 0.74)
+        line_y       = ty + title_size + int(h * 0.010)
+        dy_start     = line_y + int(h * 0.018)
+        block_bottom = dy_start + len(desc_lines) * int(desc_size * 1.6) + int(h * 0.02)
+        pad          = int(w * 0.03)
+
+        shadow = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+        ImageDraw.Draw(shadow).rounded_rectangle(
+            [tx - pad, ty - int(h * 0.014), w - tx + pad, block_bottom],
+            radius=int(h * 0.010), fill=(0, 0, 0, 95)
+        )
+        shadow = shadow.filter(ImageFilter.GaussianBlur(radius=20))
+        img = Image.alpha_composite(img.convert('RGBA'), shadow).convert('RGB')
+
+        draw = ImageDraw.Draw(img)
+        draw.text((tx, ty), t, font=title_font, fill=(255, 255, 255))
+        draw.rectangle([tx, line_y, tx + int(w * 0.20), line_y + 2],
+                        fill=(255, 255, 255, 200))
+        dy = dy_start
+        for line in desc_lines:
+            draw.text((tx, dy), line, font=desc_font, fill=(230, 230, 230))
+            dy += int(desc_size * 1.6)
+
+        buf = _io.BytesIO()
+        img.save(buf, 'JPEG', quality=95)
+        buf.seek(0)
+        return send_file(buf, mimetype='image/jpeg', download_name='cover.jpg')
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5050))
