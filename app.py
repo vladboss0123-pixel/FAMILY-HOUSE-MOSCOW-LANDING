@@ -1,8 +1,10 @@
-from flask import Flask, request, jsonify, render_template, redirect, session, send_from_directory, send_file
+from flask import Flask, request, jsonify, render_template, redirect, session, send_from_directory, send_file, abort
 import json
 import os
+import hashlib
 import requests
 from datetime import datetime
+from urllib.parse import quote
 import uuid
 import random
 
@@ -23,6 +25,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'realty-secret-2024')
 
 UPLOAD_FOLDER = 'static/uploads'
+CACHE_DIR = 'static/uploads/cache'
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', '')
@@ -43,6 +46,7 @@ VIEWS_FILE = 'data/views.json'
 
 os.makedirs('data', exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 # ── БД ─────────────────────────────────────────────────
 
@@ -270,6 +274,37 @@ def create_amo_lead(name, phone, apartment_title):
         print(f'Ошибка AmoCRM: {e}')
         return None
 
+# ── Image Proxy ────────────────────────────────────────
+
+def make_proxy_url(url: str) -> str:
+    if not url or url.startswith('/'):
+        return url
+    return '/img-proxy?url=' + quote(url, safe='')
+
+@app.route('/img-proxy')
+def img_proxy():
+    url = request.args.get('url', '')
+    if not url:
+        abort(404)
+    cache_key = hashlib.md5(url.encode()).hexdigest() + '.jpg'
+    cache_path = os.path.join(CACHE_DIR, cache_key)
+    if os.path.exists(cache_path):
+        resp = send_file(cache_path, mimetype='image/jpeg')
+        resp.headers['Cache-Control'] = 'public, max-age=604800'
+        return resp
+    try:
+        r = requests.get(url, timeout=20, headers={'User-Agent': 'Mozilla/5.0'}, stream=True)
+        if r.status_code == 200 and 'image' in r.headers.get('content-type', ''):
+            with open(cache_path, 'wb') as f:
+                for chunk in r.iter_content(65536):
+                    f.write(chunk)
+            resp = send_file(cache_path, mimetype='image/jpeg')
+            resp.headers['Cache-Control'] = 'public, max-age=604800'
+            return resp
+    except Exception as e:
+        print(f'img-proxy error: {e}')
+    abort(502)
+
 # ── Публичные ──────────────────────────────────────────
 
 @app.route('/privacy')
@@ -334,6 +369,10 @@ def track_view(apt_id):
 @app.route('/')
 def index():
     apartments = [a for a in load_apartments() if a.get('active', True)]
+    for apt in apartments:
+        apt['images'] = [make_proxy_url(u) for u in apt.get('images') or []]
+        if apt.get('covered_image'):
+            apt['covered_image'] = make_proxy_url(apt['covered_image'])
     apt_ids = [a['id'] for a in apartments]
     views = get_all_views(apt_ids)
     return render_template('index.html', apartments=apartments, views=views)
