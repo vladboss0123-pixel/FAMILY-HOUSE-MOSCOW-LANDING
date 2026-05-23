@@ -25,8 +25,9 @@ except ImportError:
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'realty-secret-2024')
 
-UPLOAD_FOLDER = 'static/uploads'
-CACHE_DIR = 'static/uploads/cache'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
+CACHE_DIR = os.path.join(BASE_DIR, 'static', 'uploads', 'cache')
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', '')
