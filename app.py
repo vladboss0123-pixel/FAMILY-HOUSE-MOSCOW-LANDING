@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template, redirect, session, send_from_directory, send_file, abort
 import json
 import os
+import re
 import hashlib
 import requests
 from datetime import datetime
@@ -823,6 +824,127 @@ def api_create_cover():
         img.save(buf, 'JPEG', quality=95)
         buf.seek(0)
         return send_file(buf, mimetype='image/jpeg', download_name='cover.jpg')
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/apt-cover', methods=['POST'])
+def api_apt_cover():
+    """
+    Генерирует обложку в стиле watermark-скрипта.
+    Принимает: multipart/form-data
+      - photo: изображение
+      - metro:  название станции (без «станция»)
+      - rooms:  только цифра (1, 2, 3...)
+      - area:   только цифра (65, 110...)
+      - floor:  только цифра этажа
+      - description: 1-2 предложения
+    Возвращает: JPEG с наложенным текстом
+    """
+    if not check_api_key():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if 'photo' not in request.files:
+        return jsonify({'success': False, 'error': 'No photo'}), 400
+
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        import io as _io
+
+        metro       = re.sub(r'^станция\s+', '', (request.form.get('metro', '') or '').strip(), flags=re.IGNORECASE).strip()
+        rooms_raw   = (request.form.get('rooms', '') or '').strip()
+        area        = re.findall(r'\d+(?:\.\d+)?', request.form.get('area', '') or '')[0] if re.findall(r'\d+(?:\.\d+)?', request.form.get('area', '') or '') else ''
+        floor_raw   = (request.form.get('floor', '') or '').strip()
+        description = (request.form.get('description', '') or '').strip()
+
+        floor_m = re.match(r'\d+', floor_raw)
+        floor_display = f"{floor_m.group(0)} этаж" if floor_m else ''
+
+        rooms_num = re.sub(r'[кк+\s]', '', rooms_raw, flags=re.IGNORECASE).strip()
+        parts = []
+        if rooms_num.lower() in ('студия', 'studio', 'ст'):
+            parts.append('Студия')
+        elif rooms_num:
+            parts.append(f'{rooms_num}к')
+        if metro:         parts.append(metro)
+        if area:          parts.append(f'{area} м²')
+        if floor_display: parts.append(floor_display)
+        title_line = ' · '.join(parts)
+
+        img = Image.open(_io.BytesIO(request.files['photo'].read())).convert('RGBA')
+        w, h = img.size
+
+        overlay = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+        drw = ImageDraw.Draw(overlay)
+        grad_h = int(h * 0.52)
+        for y in range(grad_h):
+            alpha = int(215 * (y / grad_h) ** 1.6)
+            drw.rectangle([(0, h - grad_h + y), (w, h - grad_h + y + 1)], fill=(0, 0, 0, alpha))
+        img = Image.alpha_composite(img, overlay).convert('RGB')
+
+        FONT_DIR  = os.path.join(os.path.dirname(__file__), 'static', 'fonts')
+        FONT_BOLD = os.path.join(FONT_DIR, 'MontserratBold.ttf')
+        FONT_REG  = os.path.join(FONT_DIR, 'MontserratRegular.ttf')
+
+        if not os.path.exists(FONT_BOLD):
+            buf = _io.BytesIO(); img.save(buf, 'JPEG', quality=95); buf.seek(0)
+            return send_file(buf, mimetype='image/jpeg', download_name='cover.jpg')
+
+        draw_img   = ImageDraw.Draw(img)
+        tx         = int(w * 0.06)
+        max_text_w = int(w * 0.88)
+        bottom_pad = int(h * 0.09)
+        max_block_h = int(h * 0.42)
+
+        title_size = int(w * 0.068)
+        title_font = None
+        while title_size > int(w * 0.028):
+            try:
+                tf = ImageFont.truetype(FONT_BOLD, title_size)
+            except Exception:
+                title_size -= 2; continue
+            if draw_img.textbbox((0, 0), title_line, font=tf)[2] <= max_text_w:
+                title_font = tf; break
+            title_size -= 2
+        if not title_font:
+            title_font = ImageFont.truetype(FONT_BOLD, int(w * 0.028))
+
+        desc_size = max(int(title_size * 0.54), int(w * 0.026))
+        desc_font = ImageFont.truetype(FONT_REG, desc_size)
+
+        line_h_title = int(title_size * 1.2)
+        line_h_desc  = int(desc_size * 1.55)
+        gap          = int(h * 0.020)
+
+        def _wrap(text, font, max_w, max_lines):
+            words, lines, cur = text.split(), [], ''
+            for word in words:
+                test = (cur + ' ' + word).strip()
+                if draw_img.textbbox((0, 0), test, font=font)[2] <= max_w:
+                    cur = test
+                else:
+                    if cur: lines.append(cur)
+                    cur = word
+                if len(lines) >= max_lines: break
+            if cur and len(lines) < max_lines: lines.append(cur)
+            return lines
+
+        space_for_desc = max_block_h - line_h_title - gap
+        max_desc_lines = max(1, min(3, space_for_desc // line_h_desc))
+        desc_lines = _wrap(description, desc_font, max_text_w, max_desc_lines) if description else []
+
+        total_h   = line_h_title + gap + len(desc_lines) * line_h_desc
+        block_top = h - bottom_pad - total_h
+
+        draw_img.text((tx, block_top), title_line, font=title_font, fill=(255, 255, 255))
+        ty = block_top + line_h_title + gap
+        for line in desc_lines:
+            draw_img.text((tx, ty), line, font=desc_font, fill=(215, 215, 215))
+            ty += line_h_desc
+
+        buf = _io.BytesIO(); img.save(buf, 'JPEG', quality=95); buf.seek(0)
+        return send_file(buf, mimetype='image/jpeg', download_name='cover.jpg')
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
