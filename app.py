@@ -83,6 +83,18 @@ def init_db():
             count INTEGER NOT NULL DEFAULT 0
         )
     ''')
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS leads (
+            id SERIAL PRIMARY KEY,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            name TEXT NOT NULL DEFAULT '',
+            phone TEXT NOT NULL DEFAULT '',
+            apartment TEXT NOT NULL DEFAULT '',
+            apartment_id TEXT NOT NULL DEFAULT '',
+            note TEXT NOT NULL DEFAULT '',
+            amo JSONB
+        )
+    ''')
     conn.commit()
     cur.close()
     conn.close()
@@ -94,6 +106,41 @@ def apt_from_row(row):
     if d.get('images') is None:
         d['images'] = []
     return d
+
+def save_lead(name, phone, apartment='', apartment_id='', note='', amo=None):
+    if USE_DB:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            'INSERT INTO leads (name, phone, apartment, apartment_id, note, amo) VALUES (%s,%s,%s,%s,%s,%s)',
+            (name, phone, apartment, apartment_id, note, json.dumps(amo) if amo else None)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    else:
+        log_file = 'data/leads.json'
+        logs = json.load(open(log_file)) if os.path.exists(log_file) else []
+        logs.append({'time': datetime.now().isoformat(), 'name': name, 'phone': phone,
+                     'apartment': apartment, 'apartment_id': apartment_id, 'note': note, 'amo': amo})
+        json.dump(logs, open(log_file, 'w'), ensure_ascii=False, indent=2)
+
+def get_leads():
+    if USE_DB:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT * FROM leads ORDER BY created_at DESC')
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d['time'] = d['created_at'].isoformat() if isinstance(d.get('created_at'), datetime) else str(d.get('created_at', ''))
+            result.append(d)
+        return result
+    log_file = 'data/leads.json'
+    return list(reversed(json.load(open(log_file)))) if os.path.exists(log_file) else []
 
 def migrate_from_json():
     json_file = 'data/apartments.json'
@@ -342,10 +389,7 @@ def submit_quiz():
         except Exception as e:
             print(f'Ошибка AmoCRM квиз: {e}')
 
-    log_file = 'data/leads.json'
-    logs = json.load(open(log_file)) if os.path.exists(log_file) else []
-    logs.append({'time': datetime.now().isoformat(), 'name': name, 'phone': phone, 'apartment': 'Квиз', 'note': note})
-    json.dump(logs, open(log_file, 'w'), ensure_ascii=False, indent=2)
+    save_lead(name, phone, apartment='Квиз', note=note)
     return jsonify({'success': True})
 
 @app.route('/view/<apt_id>', methods=['POST'])
@@ -389,15 +433,7 @@ def submit():
     if not name or not phone:
         return jsonify({'success': False, 'error': 'Заполните все поля'})
     result = create_amo_lead(name, phone, apt_title)
-    log_file = 'data/leads.json'
-    logs = json.load(open(log_file)) if os.path.exists(log_file) else []
-    logs.append({
-        'time': datetime.now().isoformat(),
-        'name': name, 'phone': phone,
-        'apartment': apt_title, 'apartment_id': apt_id,
-        'amo': result
-    })
-    json.dump(logs, open(log_file, 'w'), ensure_ascii=False, indent=2)
+    save_lead(name, phone, apartment=apt_title, apartment_id=apt_id, amo=result)
     return jsonify({'success': True})
 
 @app.route('/static/uploads/<filename>')
@@ -667,8 +703,7 @@ def api_import():
 def admin_leads():
     if not session.get('admin'):
         return redirect('/admin/login')
-    log_file = 'data/leads.json'
-    leads = list(reversed(json.load(open(log_file)))) if os.path.exists(log_file) else []
+    leads = get_leads()
     return render_template('leads.html', leads=leads)
 
 @app.route('/api/process-photo', methods=['POST'])
