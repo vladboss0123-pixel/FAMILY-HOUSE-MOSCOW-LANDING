@@ -325,6 +325,15 @@ def create_amo_lead(name, phone, apartment_title):
 
 # ── Image Proxy ────────────────────────────────────────
 
+import re as _re
+
+def _normalize_drive_url(url: str) -> str:
+    """lh3.googleusercontent.com/d/ID → drive.usercontent.google.com (рабочий формат)."""
+    m = _re.match(r'https?://lh3\.googleusercontent\.com/d/([a-zA-Z0-9_-]+)', url)
+    if m:
+        return f'https://drive.usercontent.google.com/download?id={m.group(1)}&export=view'
+    return url
+
 def make_proxy_url(url: str) -> str:
     if not url or url.startswith('/'):
         return url
@@ -335,6 +344,7 @@ def img_proxy():
     url = request.args.get('url', '')
     if not url:
         abort(404)
+    url = _normalize_drive_url(url)
     cache_key = hashlib.md5(url.encode()).hexdigest() + '.jpg'
     cache_path = os.path.join(CACHE_DIR, cache_key)
     if os.path.exists(cache_path):
@@ -350,6 +360,7 @@ def img_proxy():
             resp = send_file(cache_path, mimetype='image/jpeg')
             resp.headers['Cache-Control'] = 'public, max-age=604800'
             return resp
+        print(f'img-proxy bad response: {r.status_code} {r.headers.get("content-type")} for {url}')
     except Exception as e:
         print(f'img-proxy error: {e}')
     abort(502)
